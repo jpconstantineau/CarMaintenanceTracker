@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Car Maintenance Tracker</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Car Maintenance Tracker</h1>
+      <p>Vanilla HTML/CSS/JS starter for tracking maintenance history and tire wear over time.</p>
+    </header>
+
+    <main>
+      <section>
+        <h2>GitHub Gist</h2>
+        <p>
+          Placeholder flow: sign in with GitHub, choose a gist, load car history, add maintenance updates,
+          and save back to gist as JSON.
+        </p>
+        <div class="row">
+          <input id="gist-id" type="text" placeholder="Gist ID" />
+          <button id="load-gist" type="button">Load from Gist (placeholder)</button>
+          <button id="save-gist" type="button">Save to Gist (placeholder)</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Cars</h2>
+        <div class="row">
+          <input id="car-name" type="text" placeholder="Car name (e.g. Civic 2018)" />
+          <button id="add-car" type="button">Add Car</button>
+        </div>
+        <ul id="cars-list"></ul>
+      </section>
+
+      <section>
+        <h2>Maintenance Entry</h2>
+        <div class="grid two">
+          <label>
+            Date
+            <input id="maintenance-date" type="date" />
+          </label>
+          <label>
+            Mileage
+            <input id="maintenance-mileage" type="number" min="0" placeholder="km or miles" />
+          </label>
+          <label>
+            Type
+            <select id="maintenance-type">
+              <option value="oil-change">Oil change</option>
+              <option value="tire-swap">Tire swap</option>
+              <option value="tire-rotation">Tire rotation</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label>
+            Notes
+            <input id="maintenance-notes" type="text" placeholder="Optional notes" />
+          </label>
+        </div>
+        <button id="add-maintenance" type="button">Add Maintenance Entry</button>
+        <ul id="maintenance-list"></ul>
+      </section>
+
+      <section>
+        <h2>Tire Measurements (placeholder)</h2>
+        <p>
+          Each tire measurement event captures 8 tread depth values (inner and outer edges, 4 points each),
+          then stores an average with location and date.
+        </p>
+        <div class="grid three">
+          <label>
+            Tire set name
+            <input id="tire-set" type="text" placeholder="Summer 2026" />
+          </label>
+          <label>
+            Tire location
+            <select id="tire-location">
+              <option>Front Left</option>
+              <option>Front Right</option>
+              <option>Rear Left</option>
+              <option>Rear Right</option>
+            </select>
+          </label>
+          <label>
+            Measurement date
+            <input id="measurement-date" type="date" />
+          </label>
+        </div>
+        <button id="add-measurement" type="button">Add Placeholder Measurement</button>
+        <ul id="measurement-list"></ul>
+      </section>
+    </main>
+
+    <footer>
+      <small>Repo preparation scaffold only. Data persistence/authentication still to be implemented.</small>
+    </footer>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
