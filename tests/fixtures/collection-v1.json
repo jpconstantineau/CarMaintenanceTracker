@@ -1,0 +1,26 @@
+{
+  "format": "car-maintenance-tracker",
+  "schemaVersion": 1,
+  "id": "414c4f18-557a-4d55-9f54-367c2abb0808",
+  "vehicles": [
+    {
+      "id": "350654d6-0c27-407d-b893-66da72ed32d8",
+      "name": "Older Civic",
+      "odometerUnit": "km",
+      "make": "Honda",
+      "model": "Civic",
+      "year": 2011,
+      "notes": "Earlier service history unknown.\nKeep these original notes.",
+      "createdAt": "2026-11-21T12:00:00.000Z",
+      "updatedAt": "2026-11-21T12:00:00.000Z"
+    }
+  ],
+  "records": [],
+  "tombstones": [
+    {
+      "id": "670654d6-0c27-407d-b893-66da72ed32d8",
+      "kind": "vehicle",
+      "deletedAt": "2026-11-21T11:00:00.000Z"
+    }
+  ]
+}

@@ -1,103 +1,98 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
     <title>Car Maintenance Tracker</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
     <header>
       <h1>Car Maintenance Tracker</h1>
-      <p>Vanilla HTML/CSS/JS starter for tracking maintenance history and tire wear over time.</p>
+      <p>Your vehicles, one history at a time.</p>
     </header>
-
     <main>
-      <section>
-        <h2>GitHub Gist</h2>
-        <p>
-          Placeholder flow: sign in with GitHub, choose a gist, load car history, add maintenance updates,
-          and save back to gist as JSON.
-        </p>
-        <div class="row">
-          <input id="gist-id" type="text" placeholder="Gist ID" />
-          <button id="load-gist" type="button">Load from Gist (placeholder)</button>
-          <button id="save-gist" type="button">Save to Gist (placeholder)</button>
-        </div>
+      <div class="save-state">
+        <p id="save-status" role="status">Opening local vehicles…</p>
+        <p id="storage-error" role="alert"></p>
+        <button id="retry" type="button" hidden>Retry local storage</button>
+      </div>
+
+      <section id="selection" aria-labelledby="selection-title" hidden>
+        <h2 id="selection-title" tabindex="-1">Your vehicles</h2>
+        <p id="empty-list">Start with a name and odometer units. No past mileage or service records needed.</p>
+        <ul id="vehicle-list"></ul>
+        <button id="add-vehicle" type="button">Add vehicle</button>
       </section>
 
-      <section>
-        <h2>Cars</h2>
-        <div class="row">
-          <input id="car-name" type="text" placeholder="Car name (e.g. Civic 2018)" />
-          <button id="add-car" type="button">Add Car</button>
-        </div>
-        <ul id="cars-list"></ul>
+      <section id="vehicle-summary" aria-labelledby="vehicle-title" hidden>
+        <button id="all-vehicles" type="button" class="secondary">All vehicles</button>
+        <h2 id="vehicle-title" tabindex="-1"></h2>
+        <p id="vehicle-description"></p>
+        <dl>
+          <dt>Odometer units</dt><dd id="summary-units"></dd>
+          <dt>Latest known mileage</dt><dd id="summary-mileage"></dd>
+          <dt>Vehicle history</dt><dd id="summary-history"></dd>
+          <dt>Notes</dt><dd id="summary-notes"></dd>
+        </dl>
+        <button id="edit-vehicle" type="button">Edit vehicle details</button>
       </section>
 
-      <section>
-        <h2>Maintenance Entry</h2>
-        <div class="grid two">
-          <label>
-            Date
-            <input id="maintenance-date" type="date" />
-          </label>
-          <label>
-            Mileage
-            <input id="maintenance-mileage" type="number" min="0" placeholder="km or miles" />
-          </label>
-          <label>
-            Type
-            <select id="maintenance-type">
-              <option value="oil-change">Oil change</option>
-              <option value="tire-swap">Tire swap</option>
-              <option value="tire-rotation">Tire rotation</option>
-              <option value="other">Other</option>
-            </select>
-          </label>
-          <label>
-            Notes
-            <input id="maintenance-notes" type="text" placeholder="Optional notes" />
-          </label>
-        </div>
-        <button id="add-maintenance" type="button">Add Maintenance Entry</button>
-        <ul id="maintenance-list"></ul>
+      <section id="vehicle-editor" aria-labelledby="editor-title" hidden>
+        <h2 id="editor-title" tabindex="-1">Add vehicle</h2>
+        <p>Only name and odometer units are required. Details save on this device when you submit.</p>
+        <form id="vehicle-form" aria-labelledby="editor-title" novalidate>
+          <fieldset id="editor-fields">
+            <legend>Vehicle details</legend>
+            <div class="field">
+              <label for="vehicle-name">Vehicle name (required)</label>
+              <p id="name-hint" class="hint">A name you recognize, such as “Blue Civic”. Up to 100 characters.</p>
+              <input id="vehicle-name" name="name" required maxlength="100" aria-describedby="name-hint" aria-invalid="false">
+              <p id="name-error" class="field-error" hidden></p>
+            </div>
+            <fieldset class="units">
+              <legend>Odometer units (required)</legend>
+              <div class="choices">
+                <div><input id="unit-km" name="odometerUnit" type="radio" value="km" required aria-invalid="false"><label for="unit-km">Kilometres (km)</label></div>
+                <div><input id="unit-mi" name="odometerUnit" type="radio" value="mi" required aria-invalid="false"><label for="unit-mi">Miles (mi)</label></div>
+              </div>
+              <p id="odometerUnit-error" class="field-error" hidden></p>
+            </fieldset>
+            <div class="field">
+              <label for="vehicle-make">Make (optional)</label>
+              <input id="vehicle-make" name="make" maxlength="100" aria-invalid="false">
+              <p id="make-error" class="field-error" hidden></p>
+            </div>
+            <div class="field">
+              <label for="vehicle-model">Model (optional)</label>
+              <input id="vehicle-model" name="model" maxlength="100" aria-invalid="false">
+              <p id="model-error" class="field-error" hidden></p>
+            </div>
+            <div class="field">
+              <label for="vehicle-year">Year (optional)</label>
+              <input id="vehicle-year" name="year" inputmode="numeric" pattern="[0-9]{1,4}" maxlength="4" aria-invalid="false">
+              <p id="year-error" class="field-error" hidden></p>
+            </div>
+            <div class="field">
+              <label for="vehicle-notes">Notes (optional)</label>
+              <textarea id="vehicle-notes" name="notes" rows="4" maxlength="5000" aria-invalid="false"></textarea>
+              <p id="notes-error" class="field-error" hidden></p>
+            </div>
+            <div class="actions">
+              <button id="submit-vehicle" type="submit">Create vehicle</button>
+              <button id="cancel-edit" type="button" class="secondary">Cancel</button>
+            </div>
+          </fieldset>
+          <p id="form-error" role="alert"></p>
+        </form>
       </section>
-
-      <section>
-        <h2>Tire Measurements (placeholder)</h2>
-        <p>
-          Each tire measurement event captures 8 tread depth values (inner and outer edges, 4 points each),
-          then stores an average with location and date.
-        </p>
-        <div class="grid three">
-          <label>
-            Tire set name
-            <input id="tire-set" type="text" placeholder="Summer 2026" />
-          </label>
-          <label>
-            Tire location
-            <select id="tire-location">
-              <option>Front Left</option>
-              <option>Front Right</option>
-              <option>Rear Left</option>
-              <option>Rear Right</option>
-            </select>
-          </label>
-          <label>
-            Measurement date
-            <input id="measurement-date" type="date" />
-          </label>
-        </div>
-        <button id="add-measurement" type="button">Add Placeholder Measurement</button>
-        <ul id="measurement-list"></ul>
-      </section>
+      <noscript><p>JavaScript is needed to open and save your vehicles on this device.</p></noscript>
     </main>
-
     <footer>
-      <small>Repo preparation scaffold only. Data persistence/authentication still to be implemented.</small>
+      <p>Vehicle details stay in this browser on this device. Clearing site data removes them.</p>
+      <p>Coming later: maintenance entries, tires, fueling, forecasts, JSON transfer, and GitHub Gist sync.</p>
     </footer>
-
-    <script src="./app.js"></script>
+    <script type="module" src="./app.js"></script>
   </body>
 </html>

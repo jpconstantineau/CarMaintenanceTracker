@@ -1,0 +1,14 @@
+{
+  "name": "car-maintenance-tracker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test tests/*.test.js",
+    "test:browser": "playwright test",
+    "check": "npm test && npm run test:browser"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1"
+  }
+}
