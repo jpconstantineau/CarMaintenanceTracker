@@ -1,6 +1,6 @@
-import { createCollection, getVehicle, saveVehicle, removeVehicle, getRecord, saveSession, updateRecord, removeRecord, listItems, saveItem, removeItem, COMMON_ITEMS, HISTORY_TYPES } from './history.js?v=7bee6046bfda';
-import { summarizeVehicle, vehicleHistory, maintenanceSummary, oilSummary } from './calculations.js?v=7bee6046bfda';
-import { serialize, deserialize, previewMerge, applyMerge } from './storage.js?v=7bee6046bfda';
+import { createCollection, getVehicle, saveVehicle, removeVehicle, getRecord, saveSession, updateRecord, removeRecord, listItems, saveItem, removeItem, COMMON_ITEMS, HISTORY_TYPES } from './history.js?v=5690864654b3';
+import { summarizeVehicle, vehicleHistory, maintenanceSummary, oilSummary } from './calculations.js?v=5690864654b3';
+import { serialize, deserialize, previewMerge, applyMerge } from './storage.js?v=5690864654b3';
 
 const dateLabel = date => `${date}${date.length === 4 ? ' (year known)' : date.length === 7 ? ' (month known)' : ''}`;
 const mileageLabel = (value, unit) => value === null ? 'Mileage unknown' : `${new Intl.NumberFormat('en', { maximumFractionDigits: 3 }).format(value)} ${unit}`;

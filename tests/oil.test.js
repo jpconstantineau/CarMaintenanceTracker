@@ -180,3 +180,17 @@ test('attaching an oil-change record to an item supplies its existing service ba
   assert.equal(summary.status, 'due');
   assert.equal(Calculations.oilSummary(changed, saved.vehicleId).records.length, 1);
 });
+
+test('older unrelated mileage conflicts stay reviewable without suppressing a clean current oil interval', () => {
+  const saved = car([
+    { kind: 'odometer', date: '2020-01-01', odometer: 90000 },
+    { kind: 'odometer', date: '2020-02-01', odometer: 80000 },
+    { kind: 'oil-change', date: '2025-01-01', odometer: 99000 },
+    { kind: 'oil-life', date: '2025-02-01', odometer: 100000, oilLife: 80 },
+    { kind: 'oil-life', date: '2025-03-01', odometer: 104000, oilLife: 40 },
+  ]);
+  const result = Calculations.oilSummary(saved.collection, saved.vehicleId);
+  assert.equal(result.forecast?.dueMileage, 108000);
+  assert.equal(result.calendar?.date, '2025-03-29');
+  assert.ok(Calculations.vehicleHistory(saved.collection, saved.vehicleId).issues.some(issue => issue.code === 'decrease'));
+});

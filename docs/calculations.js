@@ -1,4 +1,4 @@
-import { getVehicle, listRecords, listItems, dateBounds } from './history.js?v=7bee6046bfda';
+import { getVehicle, listRecords, listItems, dateBounds } from './history.js?v=5690864654b3';
 
 function distance(value, from, to) {
   if (from === to) return value;
@@ -84,18 +84,19 @@ export function vehicleHistory(collection, vehicleId) {
 export function summarizeVehicle(collection, vehicleId) {
   const vehicle = getVehicle(collection, vehicleId);
   const evidence = mileageEvidence(collection, vehicleId);
+  return { vehicle, odometer: summarizeMileage(evidence, vehicle.odometerUnit),
+    history: { count: collection.records.filter(record => record.vehicleId === vehicleId).length, reason: 'Earlier maintenance history is unknown.' } };
+}
+
+function summarizeMileage(evidence, unit) {
   const latest = [...evidence.points].sort((a, b) => a.value - b.value || a.end - b.end || a.start - b.start).at(-1);
   const latestReadings = latest ? evidence.points.filter(point => Math.abs(point.value - latest.value) < 1e-8) : [];
   const latestDates = [...new Set(latestReadings.filter(point => !latestReadings.some(other => other.start > point.end)).map(point => point.date))].sort();
   const conflicting = evidence.issues.some(issue => issue.code !== 'ambiguous');
-  return {
-    vehicle,
-    odometer: conflicting ? { value: null, unit: vehicle.odometerUnit, date: null, reason: 'Conflicting mileage evidence — review vehicle history.' } :
+  return conflicting ? { value: null, unit, date: null, reason: 'Conflicting mileage evidence — review vehicle history.' } :
       latest ? { value: latest.value, unit: latest.unit, date: latestDates.length === 1 ? latestDates[0] : null,
         reason: latestDates.length === 1 ? null : `Latest date uncertain (${latestDates.join('; ')}). Review vehicle history.` } :
-      { value: null, unit: vehicle.odometerUnit, date: null, reason: 'No odometer readings recorded.' },
-    history: { count: collection.records.filter(record => record.vehicleId === vehicleId).length, reason: 'Earlier maintenance history is unknown.' },
-  };
+      { value: null, unit, date: null, reason: 'No odometer readings recorded.' };
 }
 
 function addMonths(key, months) {
@@ -172,7 +173,8 @@ function oilCalendar(forecast, evidence, latest) {
   if (dates.length < 2) return { reason: 'Two suitable dated odometers are needed for a calendar estimate.' };
   const support = dates.map(date => dated.find(point => point.date === date));
   const [from, to] = support;
-  if (evidence.issues.some(issue => issue.code !== 'ambiguous') ||
+  const supportIds = new Set(dated.filter(point => dates.includes(point.date)).map(point => point.recordId));
+  if (evidence.issues.some(issue => issue.code !== 'ambiguous' && issue.recordIds.some(id => supportIds.has(id))) ||
       evidence.points.some(point => point.date.length !== 10 && point.end >= from.start) ||
       evidence.gaps.some(gap => dateBounds(gap.date).start <= to.end && dateBounds(gap.endDate).end >= from.start)) {
     return { reason: 'Ambiguous dates or missing mileage records prevent a calendar estimate.' };
@@ -203,6 +205,12 @@ export function oilSummary(collection, vehicleId) {
     forecast: null, calendar: null, calendarReason: '', reasons: [] };
   const serviceGaps = history.records.filter(record => record.kind === 'gap' && ['all', 'oil', 'maintenance'].includes(record.historyType));
   const conflicts = new Set(evidence.issues.filter(issue => issue.code !== 'ambiguous').flatMap(issue => issue.recordIds));
+  const start = lastChange ?? readings[0];
+  const currentPoints = evidence.points.filter(point => !start || point.end >= dateBounds(start.date).start);
+  const currentIds = new Set(currentPoints.map(point => point.recordId));
+  const currentIssues = evidence.issues.filter(issue => issue.recordIds.some(id => currentIds.has(id)));
+  const currentConflict = currentIssues.some(issue => issue.code !== 'ambiguous');
+  const latestMileage = summarizeMileage({ points: currentPoints, issues: currentIssues }, result.unit);
   for (const from of [...changes].reverse()) {
     for (const to of [...changes].reverse()) {
       if (compare(from, to) >= 0 || from.odometer === null || to.odometer === null || conflicts.has(from.id) || conflicts.has(to.id)) continue;
@@ -216,15 +224,15 @@ export function oilSummary(collection, vehicleId) {
   result.count = distances.length;
   if (result.count) result.median = (distances[Math.floor((result.count - 1) / 2)] + distances[Math.floor(result.count / 2)]) / 2;
   function finish() {
-    if (!result.forecast && lastChange?.odometer !== null && lastChange && result.median !== null &&
-        !evidence.issues.some(issue => issue.code !== 'ambiguous') &&
+    if (!result.forecast && lastChange && lastChange.odometer !== null && result.median !== null &&
+        !currentConflict &&
         !serviceGaps.some(gap => dateBounds(gap.endDate).end >= dateBounds(lastChange.date).start)) {
       const dueMileage = distance(lastChange.odometer, lastChange.odometerUnit, result.unit) + result.median;
-      const latest = summarizeVehicle(collection, vehicleId).odometer;
+      const latest = latestMileage;
       result.forecast = { source: 'historical', dueMileage, remainingDistance: latest.value === null ? null : Math.max(0, dueMileage - latest.value),
         reference: latest, support: result.intervals, count: result.count };
     }
-    const calendar = oilCalendar(result.forecast, evidence, summarizeVehicle(collection, vehicleId).odometer);
+    const calendar = oilCalendar(result.forecast, evidence, latestMileage);
     result.calendar = calendar.value ?? null;
     result.calendarReason = calendar.reason ?? '';
     return result;
@@ -236,15 +244,14 @@ export function oilSummary(collection, vehicleId) {
   const latestLife = readings.at(-1);
   if (latestLife?.oilLife === 0 && readings.every(record => record === latestLife || compare(record, latestLife) < 0 || record.oilLife === 0) &&
       !serviceGaps.some(gap => dateBounds(gap.endDate).end >= dateBounds(latestLife.date).start)) {
-    result.forecast = { source: 'observed', dueMileage: latestLife.odometer === null || conflicts.size ? null : distance(latestLife.odometer, latestLife.odometerUnit, result.unit),
+    result.forecast = { source: 'observed', dueMileage: latestLife.odometer === null || currentConflict ? null : distance(latestLife.odometer, latestLife.odometerUnit, result.unit),
       remainingDistance: 0, reference: latestLife, support: [latestLife] };
     return finish();
   }
-  if (evidence.issues.some(issue => issue.code !== 'ambiguous')) {
+  if (currentConflict) {
     result.reasons.push('Conflicting mileage evidence — review vehicle history.');
     return finish();
   }
-  const start = lastChange ?? readings[0];
   const gaps = history.records.filter(record => record.kind === 'gap' && ['all', 'oil', 'maintenance', 'observation', 'odometer'].includes(record.historyType));
   if (start && gaps.some(gap => dateBounds(gap.endDate).end >= dateBounds(start.date).start)) {
     result.reasons.push('Missing records leave the current oil interval unresolved.');
