@@ -1,5 +1,6 @@
-import { createCollection, getVehicle, saveVehicle, removeVehicle, getRecord, saveSession, updateRecord, removeRecord, listItems, saveItem, removeItem, COMMON_ITEMS, HISTORY_TYPES } from './history.js?v=313a75df76a0';
-import { summarizeVehicle, vehicleHistory, maintenanceSummary } from './calculations.js?v=313a75df76a0';
+import { createCollection, getVehicle, saveVehicle, removeVehicle, getRecord, saveSession, updateRecord, removeRecord, listItems, saveItem, removeItem, COMMON_ITEMS, HISTORY_TYPES } from './history.js?v=b9a3937625e5';
+import { summarizeVehicle, vehicleHistory, maintenanceSummary } from './calculations.js?v=b9a3937625e5';
+import { serialize, deserialize, previewMerge, applyMerge } from './storage.js?v=b9a3937625e5';
 
 const dateLabel = date => `${date}${date.length === 4 ? ' (year known)' : date.length === 7 ? ' (month known)' : ''}`;
 const mileageLabel = (value, unit) => value === null ? 'Mileage unknown' : `${new Intl.NumberFormat('en', { maximumFractionDigits: 3 }).format(value)} ${unit}`;
@@ -46,6 +47,8 @@ export async function start(document, storage) {
   let fieldSequence = 0;
   let editingItemId = null;
   let historyItemId = null;
+  let importCollection = null;
+  let importPreview = null;
 
   function status(message, error = '') {
     byId('save-status').textContent = message;
@@ -54,7 +57,8 @@ export async function start(document, storage) {
   }
 
   function screen(id, focusId) {
-    for (const name of ['selection', 'vehicle-summary', 'vehicle-editor', 'history-view', 'history-editor', 'item-view', 'item-editor']) byId(name).hidden = name !== id;
+    for (const name of ['selection', 'vehicle-summary', 'vehicle-editor', 'history-view', 'history-editor', 'item-view', 'item-editor', 'backups']) byId(name).hidden = name !== id;
+    byId('open-backups').hidden = !loaded || id.endsWith('editor') || id === 'backups';
     if (focusId) byId(focusId).focus();
   }
 
@@ -684,6 +688,216 @@ export async function start(document, storage) {
     if (pending) byId('retry').hidden = false;
     else status('Saved on this device.');
   });
+  function backupError(error) {
+    byId('backup-error').textContent = `${error.message} Current data has not been replaced. Correct the file or retry.`;
+    byId('backup-error').focus();
+  }
+
+  function download(collection, name) {
+    const url = view.URL.createObjectURL(new view.Blob([serialize(collection)], { type: 'application/json' }));
+    const link = element('a');
+    link.href = url;
+    link.download = name;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    view.setTimeout(() => view.URL.revokeObjectURL(url), 60000);
+  }
+
+  function clearImport() {
+    importCollection = null;
+    importPreview = null;
+    byId('import-preview').hidden = true;
+    byId('import-file-form').reset();
+    byId('backup-error').textContent = '';
+  }
+
+  byId('open-backups').addEventListener('click', () => {
+    if (busy) return;
+    clearImport();
+    screen('backups', 'backups-title');
+  });
+  byId('close-backups').addEventListener('click', () => {
+    if (busy) return;
+    clearImport();
+    render();
+  });
+  byId('export-json').addEventListener('click', () => {
+    try { download(snapshot.collection, 'car-maintenance-backup.json'); } catch (error) { backupError(error); }
+  });
+  byId('export-recovery').addEventListener('click', async () => {
+    if (busy) return;
+    try {
+      const recovery = await storage.loadRecovery();
+      if (!recovery) throw new Error('No recovery copy exists yet. A replacement creates one.');
+      download(recovery.collection, 'car-maintenance-recovery.json');
+    } catch (error) { backupError(error); }
+  });
+  byId('cancel-import').addEventListener('click', () => {
+    if (busy) return;
+    clearImport();
+    byId('import-file').focus();
+  });
+  byId('import-file').addEventListener('change', () => {
+    importCollection = null;
+    importPreview = null;
+    byId('import-preview').hidden = true;
+    byId('backup-error').textContent = '';
+  });
+
+  function recordLabel(value) {
+    if (value.deletedAt) return `Deleted ${kindLabels[value.kind] ?? value.kind}`;
+    return value.name ?? `${kindLabels[value.kind] ?? value.kind} — ${dateLabel(value.date)}`;
+  }
+
+  function describeValue(value) {
+    if (value === null) return 'Unknown';
+    if (value === '') return 'Not specified';
+    if (Array.isArray(value)) return value.length ? value.map(describeValue).join('\n') : 'None';
+    if (typeof value === 'object') return Object.entries(value).map(([key, item]) => `${fieldLabel(key)}: ${describeValue(item)}`).join('\n');
+    return String(value);
+  }
+  const fieldNames = { odometer: 'Odometer reading', odometerUnit: 'Odometer unit', fuelUnit: 'Fuel unit', vehicleId: 'Vehicle ID', itemId: 'Maintenance item ID', createdAt: 'Created', updatedAt: 'Edited', deletedAt: 'Deleted', id: 'ID' };
+  function fieldLabel(key) {
+    return fieldNames[key] ?? key.replace(/([A-Z])/g, ' $1').replace(/^./, value => value.toUpperCase());
+  }
+  function versionDetails(label, value, children = []) {
+    const details = element('details');
+    details.append(element('summary', label));
+    const list = element('dl');
+    for (const [key, field] of Object.entries(value)) {
+      list.append(element('dt', fieldLabel(key)), element('dd', describeValue(field)));
+    }
+    details.append(list);
+    for (const child of children) details.append(versionDetails(recordLabel(child), child));
+    return details;
+  }
+
+  function importChoices() {
+    return Object.fromEntries(new view.FormData(byId('merge-form')));
+  }
+  function updateConflictGroups() {
+    const choices = importChoices();
+    for (const conflict of importPreview.conflicts) {
+      const covered = importPreview.conflicts.some(parent => parent.group && parent.children.includes(conflict.id) && ['local', 'incoming'].includes(choices[parent.id]));
+      const group = byId(`conflict-${conflict.id}`);
+      group.hidden = covered;
+      group.disabled = covered;
+    }
+  }
+  function showImportPreview() {
+    byId('import-counts').textContent = `${importPreview.additions.length} additions, ${importPreview.conflicts.length} conflicts, ${importPreview.unchanged} already matching.` +
+      (importPreview.conflicts.some(conflict => conflict.group) ? ' Additions linked to a conflicting vehicle or item follow your choice for that group.' : '');
+    byId('import-collection-note').hidden = !importPreview.differentCollection;
+    const additions = byId('import-additions');
+    additions.replaceChildren();
+    for (const addition of importPreview.additions) {
+      const row = element('li');
+      row.append(versionDetails(recordLabel(addition.incoming), addition.incoming));
+      additions.append(row);
+    }
+    const conflicts = byId('import-conflicts');
+    conflicts.replaceChildren();
+    for (const conflict of importPreview.conflicts) {
+      const group = element('fieldset', undefined, 'import-conflict');
+      group.id = `conflict-${conflict.id}`;
+      group.append(element('legend', `${recordLabel(conflict.local)} / ${recordLabel(conflict.incoming)}`));
+      if (conflict.group) group.append(element('p', 'These versions share an ID. Keeping one version also keeps only its linked history.' +
+        (conflict.canCombine ? ' Combine histories only if you know this is the same vehicle.' : '')));
+      for (const [side, collection, label] of [['local', snapshot.collection, 'This device'], ['incoming', importCollection, 'Imported file']]) {
+        const children = [...collection.items, ...collection.records, ...collection.tombstones].filter(value => conflict.children.includes(value.id));
+        group.append(versionDetails(label, conflict[side], children));
+      }
+      const options = [['local', conflict.group ? 'Keep this device’s version and linked history' : 'Keep this device’s version'], ['incoming', conflict.group ? 'Use imported version and linked history' : 'Use imported version']];
+      if (conflict.canCombine) options.push(['merge-local', 'Same vehicle: combine histories, keep this device’s details'], ['merge-incoming', 'Same vehicle: combine histories, use imported details']);
+      const choices = element('div', undefined, 'choices');
+      for (const [value, label] of options) {
+        const row = element('div');
+        const input = element('input');
+        input.type = 'radio';
+        input.name = conflict.id;
+        input.value = value;
+        input.id = `${conflict.id}-${value}`;
+        input.required = true;
+        const caption = element('label', label);
+        caption.htmlFor = input.id;
+        row.append(input, caption);
+        choices.append(row);
+      }
+      group.append(choices);
+      conflicts.append(group);
+    }
+    byId('import-preview').hidden = false;
+    status('Import preview ready. No changes applied.');
+    byId('preview-title').focus();
+  }
+  byId('merge-form').addEventListener('change', () => {
+    byId('backup-error').textContent = '';
+    updateConflictGroups();
+  });
+  byId('import-file-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (busy) return;
+    const file = byId('import-file').files[0];
+    if (!file) return;
+    busy = true;
+    byId('preview-import').disabled = true;
+    byId('import-file').disabled = true;
+    byId('backup-error').textContent = '';
+    try {
+      importCollection = deserialize(await file.text());
+      importPreview = previewMerge(snapshot.collection, importCollection);
+      showImportPreview();
+    } catch (error) {
+      importCollection = null;
+      importPreview = null;
+      byId('import-preview').hidden = true;
+      backupError(error);
+    } finally {
+      busy = false;
+      byId('preview-import').disabled = false;
+      byId('import-file').disabled = false;
+    }
+  });
+
+  async function commitImport(replace) {
+    if (busy || !importCollection) return;
+    try {
+      const collection = replace ? importCollection : applyMerge(snapshot.collection, importCollection, importChoices());
+      const selectedVehicleId = collection.vehicles.some(vehicle => vehicle.id === snapshot.selectedVehicleId) ? snapshot.selectedVehicleId : null;
+      const candidate = { collection, selectedVehicleId, revision: snapshot.revision };
+      busy = true;
+      for (const control of byId('backups').querySelectorAll('button, input')) control.disabled = true;
+      status('Saving on this device…');
+      const saved = replace ? await storage.replace(candidate, snapshot) : await storage.save(candidate);
+      snapshot = { ...candidate, revision: saved.revision };
+      pending = false;
+      clearImport();
+      status(replace ? 'Collection replaced and saved on this device. Recovery copy available.' : 'Import merged and saved on this device.');
+      byId('backups-title').focus();
+    } catch (error) {
+      backupError(error);
+      status('Import not applied.');
+    } finally {
+      busy = false;
+      for (const control of byId('backups').querySelectorAll('button, input')) control.disabled = false;
+    }
+  }
+  byId('merge-form').addEventListener('submit', event => {
+    event.preventDefault();
+    const invalid = [...byId('merge-form').querySelectorAll('input')].find(input => !input.matches(':disabled') && !input.validity.valid);
+    if (invalid) {
+      byId('backup-error').textContent = 'Choose a version for every conflict before merging.';
+      invalid.focus();
+      return;
+    }
+    commitImport(false);
+  });
+  byId('replace-import').addEventListener('click', () => {
+    if (busy || !importCollection) return;
+    if (view.confirm('Replace the entire collection with this file? The current collection will be saved as the recovery copy first.')) commitImport(true);
+  });
+
   view.addEventListener('beforeunload', event => {
     if (pending || dirty) { event.preventDefault(); event.returnValue = ''; }
   });

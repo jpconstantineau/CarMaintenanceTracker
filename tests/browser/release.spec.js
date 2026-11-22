@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { once } from 'node:events';
 
-for (const fixture of ['pre-history-release', 'pre-maintenance-release']) {
+for (const fixture of ['pre-history-release', 'pre-maintenance-release', 'pre-backup-release']) {
 test(`a cached ${fixture} upgrades to history and maintenance without clearing browser data`, async ({ page }) => {
   const previous = JSON.parse(await readFile(new URL(`../fixtures/${fixture}.json`, import.meta.url)));
   const current = Object.fromEntries(await Promise.all(Object.keys(previous.assets).map(async name =>
@@ -53,6 +53,14 @@ test(`a cached ${fixture} upgrades to history and maintenance without clearing b
     await page.getByLabel('Common item').selectOption('Brakes');
     await page.getByRole('button', { name: 'Save item', exact: true }).click();
     await expect(page.locator('#item-details')).toContainText('History only');
+    await page.getByRole('button', { name: 'JSON backups', exact: true }).click();
+    const exported = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
+    await page.getByLabel('App JSON file').setInputFiles(await (await exported).path());
+    await page.getByRole('button', { name: 'Preview import', exact: true }).click();
+    await expect(page.locator('#import-counts')).toContainText('0 additions, 0 conflicts');
+    await page.getByRole('button', { name: 'Merge import', exact: true }).click();
+    await expect(page.locator('#save-status')).toHaveText('Import merged and saved on this device.');
   } finally {
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));

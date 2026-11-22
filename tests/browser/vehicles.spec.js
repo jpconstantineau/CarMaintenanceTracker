@@ -77,6 +77,8 @@ test('keyboard creation, accessible validation, correction and cancel @live', as
   await page.goto('./');
   await expect(page.getByRole('button', { name: 'Add vehicle', exact: true })).toBeVisible();
   await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'JSON backups', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
   await expect(page.getByLabel('Theme', { exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Add vehicle', exact: true })).toBeFocused();

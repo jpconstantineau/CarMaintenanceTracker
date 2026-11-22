@@ -1,4 +1,4 @@
-import { start } from './interface.js?v=313a75df76a0';
-import { createLocalStorage } from './storage.js?v=313a75df76a0';
+import { start } from './interface.js?v=b9a3937625e5';
+import { createLocalStorage } from './storage.js?v=b9a3937625e5';
 
 start(document, createLocalStorage());

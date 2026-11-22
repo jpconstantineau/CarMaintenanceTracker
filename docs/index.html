@@ -13,11 +13,12 @@
       } catch { /* The system theme remains available when storage is blocked. */ }
     </script>
     <title>Car Maintenance Tracker</title>
-    <link rel="stylesheet" href="./styles.css?v=313a75df76a0">
+    <link rel="stylesheet" href="./styles.css?v=b9a3937625e5">
   </head>
   <body>
     <header>
       <h1>Car Maintenance Tracker</h1>
+      <button id="open-backups" type="button" class="secondary" hidden>JSON backups</button>
       <div class="theme-control">
         <label for="theme">Theme</label>
         <select id="theme" name="theme">
@@ -34,6 +35,40 @@
         <p id="storage-error" role="alert"></p>
         <button id="retry" type="button" hidden>Retry local storage</button>
       </div>
+
+      <section id="backups" aria-labelledby="backups-title" hidden>
+        <h2 id="backups-title" tabindex="-1">JSON backups</h2>
+        <div class="actions">
+          <button id="close-backups" type="button" class="secondary">Back to vehicles</button>
+          <button id="export-json" type="button">Export JSON</button>
+          <button id="export-recovery" type="button" class="secondary">Download recovery copy</button>
+        </div>
+        <p id="backup-error" role="alert" tabindex="-1"></p>
+        <form id="import-file-form" aria-labelledby="import-title">
+          <h3 id="import-title">Import app JSON</h3>
+          <div class="field">
+            <label for="import-file">App JSON file</label>
+            <input id="import-file" name="file" type="file" accept=".json,application/json" required>
+          </div>
+          <button id="preview-import" type="submit">Preview import</button>
+        </form>
+        <section id="import-preview" aria-labelledby="preview-title" hidden>
+          <h3 id="preview-title" tabindex="-1">Review import</h3>
+          <p id="import-counts"></p>
+          <p id="import-collection-note" hidden>This file is from a different collection. Merging keeps this collection's identity and matches records only by their IDs.</p>
+          <ul id="import-additions"></ul>
+          <form id="merge-form" aria-labelledby="preview-title" novalidate>
+            <div id="import-conflicts"></div>
+            <div class="actions">
+              <button id="merge-import" type="submit">Merge import</button>
+              <button id="cancel-import" type="button" class="secondary">Cancel import</button>
+            </div>
+          </form>
+          <h3>Restore entire collection</h3>
+          <p>Replacement uses only this file. Your current collection is saved as the recovery copy first, replacing any previous recovery copy.</p>
+          <button id="replace-import" type="button" class="secondary">Replace entire collection</button>
+        </section>
+      </section>
 
       <section id="selection" aria-labelledby="selection-title" hidden>
         <h2 id="selection-title" tabindex="-1">Your vehicles</h2>
@@ -179,6 +214,6 @@
       </section>
       <noscript><p>JavaScript is needed to open and save your vehicles on this device.</p></noscript>
     </main>
-    <script type="module" src="./app.js?v=313a75df76a0"></script>
+    <script type="module" src="./app.js?v=b9a3937625e5"></script>
   </body>
 </html>
