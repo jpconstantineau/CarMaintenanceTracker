@@ -1,4 +1,4 @@
-import { getVehicle, listRecords, listItems, dateBounds } from './history.js?v=b9a3937625e5';
+import { getVehicle, listRecords, listItems, dateBounds } from './history.js?v=a1d139dcd575';
 
 function distance(value, from, to) {
   if (from === to) return value;

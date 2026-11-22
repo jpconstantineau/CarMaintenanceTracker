@@ -94,6 +94,8 @@ test('conflict choices preserve identity, show literal versions and work at narr
   await preview(page, incoming);
   await page.getByRole('button', { name: 'Merge import', exact: true }).click();
   await expect(page.getByLabel('Keep this device’s version and linked history', { exact: true })).toBeFocused();
+  await expect(page.getByLabel('Keep this device’s version and linked history', { exact: true })).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByLabel('Keep this device’s version and linked history', { exact: true })).toHaveAccessibleDescription('Choose a version for this conflict.');
   await expect(page.locator('#backup-error')).toContainText('Choose a version');
   await page.locator('#import-conflicts summary').filter({ hasText: 'Imported file' }).click();
   await expect(page.locator('#import-conflicts')).toContainText('<img src=x>');
@@ -105,6 +107,7 @@ test('conflict choices preserve identity, show literal versions and work at narr
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByLabel('Same vehicle: combine histories, use imported details').focus();
   await page.keyboard.press('Space');
+  await expect(page.getByLabel('Same vehicle: combine histories, use imported details')).toHaveAttribute('aria-invalid', 'false');
   await page.screenshot({ path: testInfo.outputPath('backup-conflict-dark-narrow.png'), fullPage: true });
   await page.getByRole('button', { name: 'Merge import', exact: true }).focus();
   await page.keyboard.press('Enter');
@@ -161,4 +164,31 @@ test('invalid files and aborted merge/recovery writes leave data intact and allo
   page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: 'Replace entire collection', exact: true }).click();
   await expect(page.locator('#save-status')).toHaveText('Collection replaced and saved on this device. Recovery copy available.');
+});
+
+test('a valid file with a merge-only identity collision can still replace the collection recoverably', async ({ page }) => {
+  const local = History.saveVehicle(History.createCollection(), { name: 'Old collection', odometerUnit: 'km' }).collection;
+  await page.goto('./');
+  await page.getByRole('button', { name: 'JSON backups' }).click();
+  await preview(page, local);
+  await page.getByRole('button', { name: 'Merge import', exact: true }).click();
+  await expect(page.locator('#import-preview')).toBeHidden();
+  const currentId = await page.evaluate(async () => {
+    const { createLocalStorage } = await import('./storage.js');
+    return (await createLocalStorage().load()).collection.id;
+  });
+  const incoming = History.saveVehicle(History.createCollection(), { name: 'New collection', odometerUnit: 'mi' }).collection;
+  incoming.vehicles[0].id = currentId;
+  await preview(page, incoming);
+  await expect(page.getByRole('button', { name: 'Merge import', exact: true })).toBeDisabled();
+  await expect(page.locator('#import-counts')).toContainText('cannot be merged');
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Replace entire collection', exact: true }).click();
+  await expect(page.locator('#save-status')).toContainText('Collection replaced and saved');
+  const result = await page.evaluate(async () => {
+    const { createLocalStorage } = await import('./storage.js');
+    return { current: await createLocalStorage().load(), recovery: await createLocalStorage().loadRecovery() };
+  });
+  expect(result.current.collection).toEqual(incoming);
+  expect(result.recovery.collection.vehicles[0].name).toBe('Old collection');
 });

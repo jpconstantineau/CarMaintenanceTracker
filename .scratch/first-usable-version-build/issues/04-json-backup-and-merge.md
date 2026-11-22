@@ -38,3 +38,17 @@ Work from the source specification and [domain glossary](../../../GLOSSARY.md). 
 
 The user approved this breakdown on 2026-11-21. This ticket is ready for implementation once its blockers are complete; the closed wayfinder decisions remain separate.
 
+## Review — 2026-11-21
+
+Fixed point: `66c37ded6bcd4ef1eb6019e1bcf3a78f3136c9ec`. Initial implementation: `8ce72cb`.
+
+### Standards
+
+The reviewer identified one P2 violation of DESIGN.md's linked, nearby validation requirement: missing conflict choices were reported only at page level. Each unanswered group now has a nearby error linked to all its radios through aria-describedby and aria-invalid, with feedback cleared when answered or covered by a whole-branch choice. A red-before-green browser regression verifies the accessible description and clearing behavior. Follow-up review confirmed it resolved, with no new standards or substantive smell findings.
+
+### Spec
+
+The reviewer identified one P2 separation problem: a valid file with a merge-only ID collision also lost access to complete replacement. Independent schema validation now remains separate from compatibility with the current collection. A valid but unmergeable file lists its contents, explains the conflict and permits recoverable replacement; invalid files permit neither action. A red-before-green browser regression verifies replacement and the retained original recovery copy. Follow-up review confirmed it resolved, with no new specification findings.
+
+Final review counts: Standards 0 outstanding (1 resolved); Spec 0 outstanding (1 resolved).
+

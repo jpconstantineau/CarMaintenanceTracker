@@ -1,6 +1,6 @@
-import { createCollection, getVehicle, saveVehicle, removeVehicle, getRecord, saveSession, updateRecord, removeRecord, listItems, saveItem, removeItem, COMMON_ITEMS, HISTORY_TYPES } from './history.js?v=b9a3937625e5';
-import { summarizeVehicle, vehicleHistory, maintenanceSummary } from './calculations.js?v=b9a3937625e5';
-import { serialize, deserialize, previewMerge, applyMerge } from './storage.js?v=b9a3937625e5';
+import { createCollection, getVehicle, saveVehicle, removeVehicle, getRecord, saveSession, updateRecord, removeRecord, listItems, saveItem, removeItem, COMMON_ITEMS, HISTORY_TYPES } from './history.js?v=a1d139dcd575';
+import { summarizeVehicle, vehicleHistory, maintenanceSummary } from './calculations.js?v=a1d139dcd575';
+import { serialize, deserialize, previewMerge, applyMerge } from './storage.js?v=a1d139dcd575';
 
 const dateLabel = date => `${date}${date.length === 4 ? ' (year known)' : date.length === 7 ? ' (month known)' : ''}`;
 const mileageLabel = (value, unit) => value === null ? 'Mileage unknown' : `${new Intl.NumberFormat('en', { maximumFractionDigits: 3 }).format(value)} ${unit}`;
@@ -776,6 +776,16 @@ export async function start(document, storage) {
   function importChoices() {
     return Object.fromEntries(new view.FormData(byId('merge-form')));
   }
+  function conflictError(group, message = '') {
+    const error = group.querySelector('.field-error');
+    error.textContent = message;
+    error.hidden = !message;
+    for (const input of group.querySelectorAll('input')) {
+      input.setAttribute('aria-invalid', String(Boolean(message)));
+      if (message) input.setAttribute('aria-describedby', error.id);
+      else input.removeAttribute('aria-describedby');
+    }
+  }
   function updateConflictGroups() {
     const choices = importChoices();
     for (const conflict of importPreview.conflicts) {
@@ -783,12 +793,16 @@ export async function start(document, storage) {
       const group = byId(`conflict-${conflict.id}`);
       group.hidden = covered;
       group.disabled = covered;
+      if (covered) conflictError(group);
     }
   }
   function showImportPreview() {
-    byId('import-counts').textContent = `${importPreview.additions.length} additions, ${importPreview.conflicts.length} conflicts, ${importPreview.unchanged} already matching.` +
+    byId('import-counts').textContent = importPreview.mergeError ?
+      `${importPreview.mergeError} The file is valid for complete replacement; its contents are listed below.` :
+      `${importPreview.additions.length} additions, ${importPreview.conflicts.length} conflicts, ${importPreview.unchanged} already matching.` +
       (importPreview.conflicts.some(conflict => conflict.group) ? ' Additions linked to a conflicting vehicle or item follow your choice for that group.' : '');
-    byId('import-collection-note').hidden = !importPreview.differentCollection;
+    byId('merge-import').disabled = Boolean(importPreview.mergeError);
+    byId('import-collection-note').hidden = !importPreview.differentCollection || Boolean(importPreview.mergeError);
     const additions = byId('import-additions');
     additions.replaceChildren();
     for (const addition of importPreview.additions) {
@@ -825,14 +839,19 @@ export async function start(document, storage) {
         choices.append(row);
       }
       group.append(choices);
+      const error = element('p', '', 'field-error');
+      error.id = `conflict-${conflict.id}-error`;
+      error.hidden = true;
+      group.append(error);
       conflicts.append(group);
     }
     byId('import-preview').hidden = false;
     status('Import preview ready. No changes applied.');
     byId('preview-title').focus();
   }
-  byId('merge-form').addEventListener('change', () => {
+  byId('merge-form').addEventListener('change', event => {
     byId('backup-error').textContent = '';
+    conflictError(event.target.closest('fieldset'));
     updateConflictGroups();
   });
   byId('import-file-form').addEventListener('submit', async event => {
@@ -846,7 +865,15 @@ export async function start(document, storage) {
     byId('backup-error').textContent = '';
     try {
       importCollection = deserialize(await file.text());
-      importPreview = previewMerge(snapshot.collection, importCollection);
+      try {
+        importPreview = previewMerge(snapshot.collection, importCollection);
+      } catch (error) {
+        // File validity and compatibility with the current collection are separate.
+        importPreview = {
+          mergeError: error.message, conflicts: [],
+          additions: [...importCollection.vehicles, ...importCollection.items, ...importCollection.records, ...importCollection.tombstones].map(incoming => ({ incoming })),
+        };
+      }
       showImportPreview();
     } catch (error) {
       importCollection = null;
@@ -863,6 +890,7 @@ export async function start(document, storage) {
   async function commitImport(replace) {
     if (busy || !importCollection) return;
     try {
+      if (!replace && importPreview.mergeError) throw new Error(importPreview.mergeError);
       const collection = replace ? importCollection : applyMerge(snapshot.collection, importCollection, importChoices());
       const selectedVehicleId = collection.vehicles.some(vehicle => vehicle.id === snapshot.selectedVehicleId) ? snapshot.selectedVehicleId : null;
       const candidate = { collection, selectedVehicleId, revision: snapshot.revision };
@@ -881,12 +909,16 @@ export async function start(document, storage) {
     } finally {
       busy = false;
       for (const control of byId('backups').querySelectorAll('button, input')) control.disabled = false;
+      byId('merge-import').disabled = Boolean(importPreview?.mergeError);
     }
   }
   byId('merge-form').addEventListener('submit', event => {
     event.preventDefault();
     const invalid = [...byId('merge-form').querySelectorAll('input')].find(input => !input.matches(':disabled') && !input.validity.valid);
     if (invalid) {
+      for (const group of byId('import-conflicts').querySelectorAll('fieldset')) {
+        if (!group.disabled && !group.querySelector('input:checked')) conflictError(group, 'Choose a version for this conflict.');
+      }
       byId('backup-error').textContent = 'Choose a version for every conflict before merging.';
       invalid.focus();
       return;
