@@ -8,12 +8,14 @@
 
 **Source specification:** [CarMaintenanceTracker: first usable version](../../first-usable-version/spec.md). Relevant sections: Implementation Decisions 1–5, 9; Testing Decisions.
 
-**User-story coverage:** 1, 2, 3, 4, 7, 51, 52, 68.
+**User-story coverage:** 1, 2, 3, 4, 7, 51, 52, 68, 69, 70.
 
 ## Acceptance criteria
 
-- [x] Keep the runtime vanilla HTML/CSS/JavaScript and provide the vehicle selection/create screen followed by a selected-vehicle summary. Creation requires only a recognizable name and miles/kilometres; make/model/year/notes are optional.
+- [x] Keep the runtime vanilla HTML/CSS/JavaScript and provide the vehicle selection/create screen followed by a selected-vehicle summary. Setup shows name, miles/kilometres and Fuel units (litres, US gallons, Imperial gallons). Make/model/year/notes remain under native Optional details, collapsed on creation and expanded on edit; validation reveals hidden invalid fields.
 - [x] Allow several vehicles, editing their identifying details and switching between them without mixing data. An old vehicle with no historical readings is a valid collection; display missing mileage/history honestly.
+- [x] Create new vehicle IDs from the current millisecond timestamp converted to Base36, resolve local collisions including deleted IDs, and preserve identity/history when renaming. Keep IDs out of the setup form.
+- [x] Offer Delete vehicle from edit, with confirmation identifying the car and its associated history. Preserve other vehicles and retain deletion markers for the removed car and records.
 - [x] Establish stable collection/record IDs, the application format/schema version, the shared validated serialization contract, and extension points for later typed records. Preserve factual values rather than persisting forecasts as authoritative data.
 - [x] Establish the four agreed module interfaces and initialize IndexedDB, using the highest useful public interfaces. Do only the refactoring necessary for this working slice; no separate framework migration.
 - [x] Automatically save recorded changes locally and prove that reopening restores the selected collection. Display local-save success only after the transaction completes; on failure preserve editable work and expose the failure.
@@ -22,12 +24,12 @@
 
 - [x] Verify or establish the repository's GitHub Pages publishing source and a reliable per-ticket deployment/verification path. Publish this first local-vehicle slice with working controls; clearly distinguish later unavailable features from usable actions.
 - [x] After this ticket's checks pass, integrate its changes through the repository workflow into the configured GitHub Pages publishing branch, commit and push to GitHub, wait for the Pages deployment to finish, and verify the published app at https://jpconstantineau.github.io/CarMaintenanceTracker/. A feature-branch push or local test alone does not complete the ticket.
-- [x] Verify that user records from preceding published versions remain usable. Include and test non-destructive migrations if this slice changes the persisted format; never reset IndexedDB, change stable identities, or discard earlier observations merely to ship the next feature.
+- [x] Follow the owner's early-development schema policy: a new data version may clear development data instead of migrating it; document any reset in release notes. If data is retained, preserve IDs and factual values and test supported versions. Ordinary save/load failures and incompatible imports must not clear data.
 - [x] Report the live app URL, deployed commit/release evidence, and short steps the user can perform to test this slice. Complete each ticket only after its working feature is available live; coordinate a compatible Worker deployment when authentication code changes.
 
 ## Delivery after this ticket
 
-Publish this slice independently after integration, wait for successful deployment, and hand the user a live feature to test. Parallel implementation is allowed, but shared-branch integration and deployment are serialized one completed ticket at a time. Preserve earlier releases' user data and keep previously delivered features working. Browser-local data remains per-device until Gist support is delivered; JSON import/export provides manual transfer once available.
+Publish this slice independently after integration, wait for successful deployment, and hand the user a live feature to test. Parallel implementation is allowed, but shared-branch integration and deployment are serialized one completed ticket at a time. Keep previously delivered features working and follow the early-development schema policy above. Verify returning browsers with cached assets as well as fresh sessions. Browser-local data remains per-device until Gist support is delivered; JSON import/export provides manual transfer once available.
 
 ## Scope and handoff
 

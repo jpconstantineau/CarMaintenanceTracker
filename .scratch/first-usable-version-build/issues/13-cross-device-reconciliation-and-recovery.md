@@ -14,6 +14,7 @@
 
 - [ ] Use the shared base, current local state, and fresh remote collection for reconciliation by stable ID. Combine independent additions/changes and equal edits without duplicating records.
 - [ ] Show conflicting same-record edits and edit/delete conflicts for user choice; retain both versions and validate the candidate through History before applying it. Never pick by timestamp alone.
+- [ ] Cover vehicle rename with concurrent history additions, whole-car deletion versus a record edit/addition, and independent vehicles that collide on a Base36 timestamp ID. Preserve both histories for explicit resolution; local timestamp collision checks do not establish cross-device uniqueness.
 - [ ] Treat retained deletion markers distinctly from absence in older copies. Handle missing ancestry conservatively without inventing deletions.
 - [ ] Apply the same protection on explicit Load with unsaved changes and preserve local recoverable snapshots throughout review, cancellation, and failures.
 - [ ] Demonstrate that edits arriving during a network request remain pending after that request succeeds. Advance baselines only for the snapshot actually confirmed.
@@ -22,12 +23,12 @@
 - [ ] Test independent additions, equal/divergent edits, edit/delete, interrupted load/save, missing ancestry, account switch, in-flight edits, and recovery via public interfaces and a two-client browser scenario.
 
 - [ ] After this ticket's checks pass, integrate its changes through the repository workflow into the configured GitHub Pages publishing branch, commit and push to GitHub, wait for the Pages deployment to finish, and verify the published app at https://jpconstantineau.github.io/CarMaintenanceTracker/. A feature-branch push or local test alone does not complete the ticket.
-- [ ] Verify that user records from preceding published versions remain usable. Include and test non-destructive migrations if this slice changes the persisted format; never reset IndexedDB, change stable identities, or discard earlier observations merely to ship the next feature.
+- [ ] Follow the owner's early-development schema policy: a new data version may clear development data instead of migrating it; document any reset in release notes. If data is retained, preserve IDs and factual values and test supported versions. Ordinary save/load failures and incompatible imports must not clear data.
 - [ ] Report the live app URL, deployed commit/release evidence, and short steps the user can perform to test this slice. Complete each ticket only after its working feature is available live; coordinate a compatible Worker deployment when authentication code changes.
 
 ## Delivery after this ticket
 
-Publish this slice independently after integration, wait for successful deployment, and hand the user a live feature to test. Parallel implementation is allowed, but shared-branch integration and deployment are serialized one completed ticket at a time. Preserve earlier releases' user data and keep previously delivered features working. Browser-local data remains per-device until Gist support is delivered; JSON import/export provides manual transfer once available.
+Publish this slice independently after integration, wait for successful deployment, and hand the user a live feature to test. Parallel implementation is allowed, but shared-branch integration and deployment are serialized one completed ticket at a time. Keep previously delivered features working and follow the early-development schema policy above. Verify returning browsers with cached assets as well as fresh sessions. Browser-local data remains per-device until Gist support is delivered; JSON import/export provides manual transfer once available.
 
 ## Scope and handoff
 

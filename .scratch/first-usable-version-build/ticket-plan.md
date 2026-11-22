@@ -4,7 +4,7 @@ Status: approved — tickets published ready-for-agent
 
 **Source:** [CarMaintenanceTracker implementation specification](../first-usable-version/spec.md).
 
-This approved breakdown contains 14 complete implementation slices, 155 acceptance criteria, and coverage of all 68 user stories. Each ticket has independent behavior, dependency links, acceptance checks, and context for a fresh implementation session. The source spec and closed wayfinder decisions are unchanged.
+This approved breakdown contains 14 implementation slices and coverage of all 70 user stories, including the owner's vehicle-management and car-action refinements. Each ticket has independent behavior, dependency links, acceptance checks, and context for a fresh implementation session. The source spec reflects current requirements; closed wayfinder decisions retain historical rationale.
 
 ## Delivery decisions added during ticket review
 
@@ -14,7 +14,8 @@ The user requires the app to be pushed to GitHub after each ticket so features c
 - **Phase 2: cloud integration.** After the local feature milestones are live, set up Cloudflare/GitHub sign-in, then Gist load/save, then cross-device reconciliation.
 - **Final verification.** Verify the integrated first version; this is not the first opportunity for the user to try the app.
 - **Every ticket ships.** Passing tests or pushing a feature branch is insufficient: integrate through the repository workflow into the actual Pages publishing branch, commit/push, wait for deployment, verify the live app, and provide the deployed commit plus short testing steps.
-- **Preserve early test data.** Earlier released records must remain usable. Test non-destructive schema migrations when needed; do not reset browser storage or identities as an upgrade shortcut.
+- **Early development data.** The owner permits a new schema version to clear development data instead of requiring migration. Document a reset if needed. Retained data must keep its identities, units and facts; ordinary failures or incompatible imports must not clear it. Schema 3 retains earlier data without a reset.
+- **Verify cached upgrades.** Fresh-session tests are insufficient: version all transitive runtime assets and verify navigation after upgrading a browser with old assets cached.
 - **Deploy serially.** Independent code work may happen in parallel, but integrate and publish completed tickets one at a time so each release is verified. Do not wait for a full-spec integration branch to finish before publishing features.
 - **Local versus shared data.** Before Gist support, each browser/device has its own data. JSON export/import supplies manual transfer once delivered. Deployment on GitHub Pages does not itself centralize the vehicle data.
 
@@ -28,7 +29,7 @@ The first ticket verifies/establishes the actual Pages publishing source and dep
 
 2. **[Record and correct dated vehicle history](issues/02-record-and-correct-history.md)**
    - **Blocked by:** [Create and reopen local vehicles](issues/01-create-and-reopen-vehicles.md)
-   - **Delivers:** Record odometer readings and general observations, enter several dated records together, inspect the vehicle history, and correct or remove old entries without losing unknowns or chronology.
+   - **Delivers:** Record fueling, oil changes, tire changes, other maintenance, checks/inspections and odometer readings with independent blank date/mileage inputs; inspect, correct and remove history. Missing records are secondary review context.
 
 3. **[Track maintenance items and due intervals](issues/03-maintenance-items-and-due-intervals.md)**
    - **Blocked by:** [Record and correct dated vehicle history](issues/02-record-and-correct-history.md)
@@ -138,7 +139,7 @@ flowchart TD
 
 | Draft ticket | Primary/related user stories |
 | --- | --- |
-| [Create and reopen local vehicles](issues/01-create-and-reopen-vehicles.md) | 1, 2, 3, 4, 7, 51, 52, 68 |
+| [Create and reopen local vehicles](issues/01-create-and-reopen-vehicles.md) | 1, 2, 3, 4, 7, 51, 52, 68, 69, 70 |
 | [Record and correct dated vehicle history](issues/02-record-and-correct-history.md) | 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 43, 49 |
 | [Track maintenance items and due intervals](issues/03-maintenance-items-and-due-intervals.md) | 5, 6, 15, 16, 17, 18, 19, 20 |
 | [Export, preview, and merge JSON backups](issues/04-json-backup-and-merge.md) | 53, 54, 55, 56, 64 |
@@ -153,7 +154,17 @@ flowchart TD
 | [Reconcile device changes and recover uncertain saves](issues/13-cross-device-reconciliation-and-recovery.md) | 59, 60, 61, 62, 63, 66 |
 | [Verify the hosted first version across devices](issues/14-verify-hosted-first-version.md) | 5, 6, 7, 51, 52, 58, 59, 62, 63, 64, 65, 66, 67, 68 |
 
-All 68 stories have at least one owner. Each relevant slice follows the four public module interfaces, typed validation, stable IDs, unknown/date/unit preservation, IndexedDB durability, meaningful tests, purposeful web design, and the per-ticket live-delivery criteria. New domain records extend the shared portable format and preserve data recorded against earlier deployments.
+All 70 stories have at least one owner. Each relevant slice follows the four public module interfaces, typed validation, stable IDs, unknown/date/unit preservation, IndexedDB durability, meaningful tests, purposeful web design, and per-ticket live delivery. New domain records extend the shared portable format under the current development-data policy.
+
+## Car-action story review — 2026-11-21
+
+- Stories 2–3 and 69–70: fuel units, collapsed optional creation fields, stable-ID renaming and confirmed car deletion belong to ticket 01 and its delivered follow-up.
+- Stories 8–10, 13 and 19: replace shared date/odometer defaults and generic observations with named car actions, blank native inputs, checks/inspections, and secondary missing-record annotations.
+- Tickets 03, 05, 06 and 07: extend existing actions with maintenance items, oil readings/top-ups, tire swaps/rotations and tread measurements. Do not infer completed work or detailed measurements from earlier free-text notes.
+- Story 41 and ticket 09: basic Fuel up already exists; extend it with measured economy, preserving litres/US gallons/Imperial gallons and normalizing only for calculations. Ticket 10 retains derived-mileage work.
+- Tickets 04 and 13: preserve timestamp IDs across renames/transfers, review cross-device ID collisions, and reconcile vehicle deletion with associated records.
+- Ticket 14: verify these car workflows and cached-release upgrades. Forecasting formulas, cloud phase dependencies and provider setup scope remain unchanged.
+- Every ticket reflects the owner's early-stage schema-reset allowance. Tickets 08 and 10–12 otherwise keep their existing behavior; they already concern car evidence or storage/authentication rather than generic entry.
 
 ## Cloudflare and GitHub setup
 
@@ -163,6 +174,6 @@ All 68 stories have at least one owner. Each relevant slice follows the four pub
 
 ## Approval and publication
 
-The user approved the ticket breakdown on 2026-11-21 and requested that the tickets be marked ready for implementation. All 14 tickets are published as individual files in the issues directory with Status: ready-for-agent. Their dependencies, local-first release order, and per-ticket GitHub Pages delivery requirements remain unchanged.
+The user approved the ticket breakdown on 2026-11-21 and requested that the tickets be marked ready for implementation. Tickets 01–02 are complete and deployed; tickets 03–14 remain ready-for-agent subject to their blockers. Dependencies, local-first release order, and per-ticket GitHub Pages delivery requirements remain unchanged.
 
-Ticket 01 is the initial implementation frontier. Other tickets may start only after their listed blockers are complete. Approval and readiness do not mean implementation or deployment has already occurred. The source spec and closed wayfinder decisions remain unchanged.
+Ticket 03 is the next numbered implementation ticket. Other tickets may start only after their listed blockers are complete. Approval and readiness do not mean implementation or deployment has already occurred. The source spec includes the owner's follow-up refinements; closed wayfinder records remain historical.

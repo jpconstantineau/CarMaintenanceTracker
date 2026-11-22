@@ -12,7 +12,8 @@
 
 ## Acceptance criteria
 
-- [ ] Provide dated oil-change, oil-life percentage, low/normal/high oil-level with notes, and top-up-litre entries using shared defaults and optional historical facts. These remain distinct record kinds.
+- [ ] Extend Change oil and offer concrete Read oil life, Check oil level, and Top up oil actions. Record oil-life percentage, low/normal/high level with notes, and top-up litres as distinct facts. Each separate action starts with a blank native date field and numeric odometer field; incomplete historical facts remain supported.
+- [ ] Reuse the existing oil-change history and preserve its identity when adding item-specific details. Do not create a second oil change merely to attach a maintenance item, or infer oil-life/level values from earlier notes.
 - [ ] Compute completed intervals between consecutive known changes and show individual distances, median, and sample count; do not bridge a known missing-change span.
 - [ ] Fit current continuous oil-life observations against mileage using the agreed straight-line rule and evidence requirements. Preserve unknown earlier service and withhold fits across unresolved resets/gaps.
 - [ ] Show projected 0% odometer/remaining distance with supporting dates/readings. Recorded 0% makes oil due without a fit; inspection/top-up does not reset the interval or infer a 100% reading.
@@ -22,12 +23,12 @@
 - [ ] Verify the 80% at 100,000 km / 40% at 104,000 km example projects 108,000 km, plus insufficient data, flat/increasing readings, 0%, missing changes, fallback, level/top-up distinction, and a complete browser entry/review flow.
 
 - [ ] After this ticket's checks pass, integrate its changes through the repository workflow into the configured GitHub Pages publishing branch, commit and push to GitHub, wait for the Pages deployment to finish, and verify the published app at https://jpconstantineau.github.io/CarMaintenanceTracker/. A feature-branch push or local test alone does not complete the ticket.
-- [ ] Verify that user records from preceding published versions remain usable. Include and test non-destructive migrations if this slice changes the persisted format; never reset IndexedDB, change stable identities, or discard earlier observations merely to ship the next feature.
+- [ ] Follow the owner's early-development schema policy: a new data version may clear development data instead of migrating it; document any reset in release notes. If data is retained, preserve IDs and factual values and test supported versions. Ordinary save/load failures and incompatible imports must not clear data.
 - [ ] Report the live app URL, deployed commit/release evidence, and short steps the user can perform to test this slice. Complete each ticket only after its working feature is available live; coordinate a compatible Worker deployment when authentication code changes.
 
 ## Delivery after this ticket
 
-Publish this slice independently after integration, wait for successful deployment, and hand the user a live feature to test. Parallel implementation is allowed, but shared-branch integration and deployment are serialized one completed ticket at a time. Preserve earlier releases' user data and keep previously delivered features working. Browser-local data remains per-device until Gist support is delivered; JSON import/export provides manual transfer once available.
+Publish this slice independently after integration, wait for successful deployment, and hand the user a live feature to test. Parallel implementation is allowed, but shared-branch integration and deployment are serialized one completed ticket at a time. Keep previously delivered features working and follow the early-development schema policy above. Verify returning browsers with cached assets as well as fresh sessions. Browser-local data remains per-device until Gist support is delivered; JSON import/export provides manual transfer once available.
 
 ## Scope and handoff
 

@@ -12,7 +12,7 @@
 
 ## Acceptance criteria
 
-- [ ] Capture inner/outer top/front/bottom/back samples for a named individual tire, with shared dated entry defaults and optional known mileage. Samples identify within-session locations, not matched physical points over time.
+- [ ] Offer Measure tire tread for a named individual tire, capturing inner/outer top/front/bottom/back samples with its own blank native date and numeric odometer fields. Separate measurement actions do not copy date/mileage from a swap or earlier reading. Samples identify within-session locations, not matched physical points over time.
 - [ ] Accept millimetres, 32nds of an inch, and thousandths of an inch; preserve original representations and use exact conversions without rounding stored/intermediate data.
 - [ ] Retain partial sessions. Require all four samples for comparable edge mean/minimum and all eight for whole-tire mean; distinguish unavailable summaries from missing raw data.
 - [ ] Allow a user-defined effective threshold per tire, optionally prefilled from its set; do not invent a universal depth limit. Any valid observed reading at/below threshold remains visible even in an incomplete session.
@@ -22,12 +22,12 @@
 - [ ] Test equivalent 4/32 inch, 125 thousandths, and 3.175 mm readings; partial/full coverage, zero/invalid values, observed threshold crossing, non-identical physical sample points, and a phone/desktop eight-reading workflow.
 
 - [ ] After this ticket's checks pass, integrate its changes through the repository workflow into the configured GitHub Pages publishing branch, commit and push to GitHub, wait for the Pages deployment to finish, and verify the published app at https://jpconstantineau.github.io/CarMaintenanceTracker/. A feature-branch push or local test alone does not complete the ticket.
-- [ ] Verify that user records from preceding published versions remain usable. Include and test non-destructive migrations if this slice changes the persisted format; never reset IndexedDB, change stable identities, or discard earlier observations merely to ship the next feature.
+- [ ] Follow the owner's early-development schema policy: a new data version may clear development data instead of migrating it; document any reset in release notes. If data is retained, preserve IDs and factual values and test supported versions. Ordinary save/load failures and incompatible imports must not clear data.
 - [ ] Report the live app URL, deployed commit/release evidence, and short steps the user can perform to test this slice. Complete each ticket only after its working feature is available live; coordinate a compatible Worker deployment when authentication code changes.
 
 ## Delivery after this ticket
 
-Publish this slice independently after integration, wait for successful deployment, and hand the user a live feature to test. Parallel implementation is allowed, but shared-branch integration and deployment are serialized one completed ticket at a time. Preserve earlier releases' user data and keep previously delivered features working. Browser-local data remains per-device until Gist support is delivered; JSON import/export provides manual transfer once available.
+Publish this slice independently after integration, wait for successful deployment, and hand the user a live feature to test. Parallel implementation is allowed, but shared-branch integration and deployment are serialized one completed ticket at a time. Keep previously delivered features working and follow the early-development schema policy above. Verify returning browsers with cached assets as well as fresh sessions. Browser-local data remains per-device until Gist support is delivered; JSON import/export provides manual transfer once available.
 
 ## Scope and handoff
 

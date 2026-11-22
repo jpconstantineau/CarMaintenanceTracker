@@ -17,7 +17,7 @@ Phone and desktop must access the same records. Users keep their data in their o
 
 Build a vanilla HTML/CSS/JavaScript app hosted on GitHub Pages, with History, Calculations, Interface, and Storage modules in the browser. A small Cloudflare Worker provides GitHub authentication. Vehicle data remains in local IndexedDB and the user's Gist; the Worker needs no vehicle database.
 
-Begin with vehicle selection/creation, followed by the selected vehicle's summary and drill-down into maintenance, tires, fueling, observations, and history. A dated entry session shares defaults across distinct records. Backfills, corrections, and removals recalculate affected outputs.
+Begin with vehicle selection/creation, followed by the selected vehicle's summary and drill-down into maintenance, tires, fueling, checks/inspections, and history. Entry starts with recognizable car actions: fuel up, change oil, change tires, other maintenance, check/inspect, or read the odometer. Every new action starts with blank date and odometer fields. Backfills, corrections, and removals recalculate affected outputs.
 
 GitHub authentication and Gist load/save are primary first-version features. Automatically save locally, with explicit GitHub Load and Save actions. One app-managed secret Gist contains all vehicles in versioned JSON. Combine independent changes, ask about conflicts, and retain recoverable copies. Import/export uses that portable format.
 
@@ -28,8 +28,8 @@ Show forecasts with their evidence, dates, units, and limitations. Raw observati
 ### Vehicles and navigation
 
 1. As a vehicle owner, I want to select or create a vehicle on opening the app, so that I enter the correct vehicle's history.
-2. As a vehicle owner, I want creation to require only a recognizable name and odometer units, so that missing identifying details do not block tracking.
-3. As a vehicle owner, I want optional make, model, year, and notes, so that I can distinguish household vehicles.
+2. As a vehicle owner, I want simple setup with a recognizable name, odometer units (km/mi), and fuel units (litres, US gallons, or Imperial gallons), so that I can enter familiar quantities without inventing identifying details.
+3. As a vehicle owner, I want make, model, year, and notes hidden under Optional details during creation, so that I can add them when useful without a long initial form.
 4. As a vehicle owner, I want separate histories and settings for multiple vehicles, so that their parts and forecasts are not mixed.
 5. As a vehicle owner, I want a vehicle summary showing latest known mileage, upcoming maintenance, and missing evidence, so that I can see what needs attention.
 6. As a vehicle owner, I want to drill into every summary area, so that I can inspect supporting history.
@@ -37,18 +37,18 @@ Show forecasts with their evidence, dates, units, and limitations. Raw observati
 
 ### Historical entry and maintenance
 
-8. As a vehicle owner, I want a dated entry session to share vehicle, date, and odometer defaults across distinct records, so that I avoid repeated typing.
-9. As a vehicle owner, I want those defaults editable per record, so that grouping entries does not force inaccurate values.
-10. As a vehicle owner, I want exact dates or explicit month/year precision, so that approximate history stays useful without pretending to be exact.
+8. As a vehicle owner, I want to choose a car action such as fueling, changing oil, changing tires, other maintenance, checking the car, or reading its odometer, so that the entry matches what I did.
+9. As a vehicle owner, I want each new action's date and odometer to start blank and be entered independently, so that changing readings and dates are never copied from another record.
+10. As a vehicle owner, I want the browser's native date picker and numeric odometer input, with explicit month/year precision available, so that ordinary entry is easy and approximate history stays honest.
 11. As a vehicle owner, I want to enter events out of sequence, so that discovering old paperwork does not disrupt history.
 12. As a vehicle owner, I want to start on a 15-year-old vehicle without prior records, so that I can begin with what I know.
-13. As a vehicle owner, I want partial records and known-gap annotations, so that unavailable facts do not become zeros or assumed events.
+13. As a vehicle owner, I want incomplete car-action records and a separate Mark missing records action in history, so that unknown facts stay unknown without making missing history a normal car action.
 14. As a vehicle owner, I want to correct or remove mistaken records, so that affected totals and forecasts update.
 15. As a vehicle owner, I want continuous multi-year item history, so that yearly recording does not reset long-lived parts.
 16. As a vehicle owner, I want common maintenance-item choices and custom items per vehicle, so that I track applicable services and parts.
 17. As a vehicle owner, I want specifications, part numbers, preferred brands, notes, and reference links, so that replacement information is available.
 18. As a vehicle owner, I want service date, mileage when known, part used, and optional cost, so that DIY and mechanic work are documented.
-19. As a vehicle owner, I want observations distinct from completed services, so that inspecting an item does not reset its interval.
+19. As a vehicle owner, I want checks/inspections distinct from completed services, so that inspecting brakes or checking oil does not reset a replacement interval.
 20. As a vehicle owner, I want distance/time/condition-based or history-only tracking, so that recording an item does not require forecasting it.
 
 ### Oil
@@ -79,7 +79,7 @@ Show forecasts with their evidence, dates, units, and limitations. Raw observati
 
 ### Fueling and evidence
 
-41. As a vehicle owner, I want dated fuelings with litres and mileage when known, so that incomplete receipts remain useful.
+41. As a vehicle owner, I want Fuel up to record date, quantity in my chosen fuel units, and mileage when known, so that incomplete receipts remain useful and older units remain unchanged when I change vehicle setup.
 42. As a vehicle owner, I want full/partial/unknown tank status, so that consumption can be measured between full tanks.
 43. As a vehicle owner, I want all event types to supply mileage evidence, so that maintenance readings also help fueling calculations.
 44. As a vehicle owner, I want missing fueling mileage interpolated between suitable recorded readings, so that incomplete history can support estimates.
@@ -114,11 +114,18 @@ Show forecasts with their evidence, dates, units, and limitations. Raw observati
 67. As a project maintainer, I want guided Cloudflare and GitHub application setup during implementation, so that the authentication endpoint can be configured and verified.
 68. As a project maintainer, I want reproducible examples and behavior tests at public module interfaces, so that future changes preserve agreed results.
 
+### Vehicle management refinements
+
+69. As a vehicle owner, I want to rename a car while keeping its stable identity and all linked history, so that its display name can change safely.
+70. As a vehicle owner, I want to delete a car and its associated history after a clear confirmation, so that an unwanted car can be removed without affecting other vehicles.
+
 ## Implementation Decisions
 
 ### 1. Scope and current state
 
-The current app is a small browser scaffold: in-memory arrays, direct form handlers, lists, a draft serializer, and placeholder Gist actions. It has no stable vehicle/record associations, actual tread inputs, persistence, authentication, forecasts, test harness, or established module interfaces.
+The original planning baseline was a small browser scaffold. Tickets 01 and 02 now provide local vehicles, dated car-action history, stable IDs, IndexedDB persistence and browser/module tests. Detailed maintenance items, oil forecasts, individual tires, fuel economy, portable transfer and GitHub integration remain subsequent slices; basic oil/tire/fueling entry does not complete those tickets.
+
+Owner refinements from 2026-11-21 supersede the earlier shared-default and generic-entry design. During this early development stage, a new data version may clear development data instead of implementing migration. Document any reset in the release; migration is optional, not a blocker. This exception does not authorize clearing data because of ordinary read/write failures or incompatible imported/remote files.
 
 Keep the product runtime vanilla HTML/CSS/JavaScript. Development/test tooling may be added without introducing a frontend framework. GitHub Pages hosts the frontend; Cloudflare hosts authentication only. Local persistence, portable JSON, and authenticated Gist access all belong to the first version.
 
@@ -141,7 +148,7 @@ Use one portable collection with an application format identifier, schema versio
 
 | Record | Information to preserve |
 | --- | --- |
-| Vehicle | Stable ID, recognizable name, odometer units; optional make/model/year and notes. Mileage is a dated observation, not required at creation. |
+| Vehicle | Stable Base36 timestamp ID, recognizable name, odometer units and fuel units; optional make/model/year and notes. Mileage is a dated reading, not required at creation. |
 | Maintenance item | Stable ID and owning vehicle; name/category; specifications, compatible parts, preferred brand, notes/links; tracking method and configured intervals/thresholds. |
 | Tire and set | Stable individual/set IDs, recognizable labels, brand/model and membership; seasonal identity where applicable. Identity survives position changes. |
 | Factual event | Stable ID, owning vehicle and applicable item/tire references, kind, date/precision, known odometer/units, notes, and kind-specific values. |
@@ -149,11 +156,11 @@ Use one portable collection with an application format identifier, schema versio
 | Oil observation/top-up | Oil-life percentage, oil-level status/notes, or added litres as distinct facts. Oil change is its own completed service. |
 | Tire movement/baseline | Complete tire-to-position assignments with known date/mileage; distinguish installation/removal/rotation from initial observed placement. Seasonal periods are distinct from position periods. |
 | Tread session | Tire, date, mileage evidence, depth units, and up to eight named samples: inner/outer at top/front/bottom/back. |
-| Fueling | Date, litres when known, odometer when known, full/partial/unknown tank status. |
-| Known gap | Affected history type and span, allowing dependent calculations to be withheld. |
+| Fueling | Date, fuel quantity and original units when known, odometer when known, full/partial/unknown tank status. |
+| Missing-record annotation | Affected history type and span, allowing dependent calculations to be withheld without pretending that a car action occurred. |
 | Edit/deletion metadata | Stable identity and sufficient change/deletion information for reconciliation. Edit time differs from event date. |
 
-Use globally unique record identities so devices can add independently. Preserve IDs on round trips. Equal IDs identify the same record; equal names/dates alone do not. Retain deletion markers needed to distinguish deletion from absence in an older copy; do not automatically purge them in version one.
+New vehicle IDs use the creation timestamp in milliseconds converted to Base36, assigned once and preserved on rename. Increment the timestamp value if it collides with a live or deleted ID in the current collection. Preserve existing IDs, including earlier UUID vehicle IDs, when retaining data. Other record identities remain globally unique. Timestamp IDs do not guarantee cross-device uniqueness: merging must surface conflicting same-ID vehicles and preserve both histories for resolution, never silently combine unrelated cars. Equal names/dates alone do not establish identity. Retain deletion markers; deleting a vehicle removes its associated records and marks each deletion without affecting other vehicles.
 
 Keep local account/Gist association, remote revision/baseline, pending state, and recovery snapshots separate from portable records. Exclude credentials and authorization state from vehicle JSON, exports, imports, and Gists. Derived caches are disposable; raw history and settings are authoritative.
 
@@ -167,7 +174,7 @@ Optional cost is descriptive; no spending-analysis feature is required. Item doc
 
 Accept exact calendar dates and explicit month/year precision. Treat approximate dates as bounded ranges, not invented first-of-month/year observations. Order by recorded evidence, not creation time. Consistent odometer order may resolve chronology; ambiguous overlapping ranges or contradictory readings make affected calculations unavailable.
 
-Entry sessions provide editable defaults for distinct records. Changing one saved record does not silently change its siblings. An explicit correction can update all affected records.
+Each new car-action record starts with blank date and odometer fields, even when another record is open. Exact-date fields use native HTML type=date; odometer fields use type=number. Month/year precision is explicitly selectable. The selected vehicle and its unit settings may initialize ownership/units; date and mileage are actual event facts, not setup defaults. Changing one saved record does not silently change its siblings.
 
 Build the vehicle mileage timeline from every event type. Maintenance without fueling information supplies mileage evidence, not a fill-up or fuel-history gap. Do not copy a separate same-day event's mileage automatically. Shared entry values become facts only when actually supplied or accepted by the user.
 
@@ -177,11 +184,11 @@ Require t0 < t < t1, consistent chronology, and no unexplained odometer decrease
 
 Keep recorded mileage unknown; label the derived value and dependent economy figures estimated. Approximate dates may yield a defensible range; otherwise withhold a point estimate. Conflicts and known gaps cannot be bridged silently.
 
-Vehicles display miles or kilometres. Fuel/top-ups use litres. Depth entry supports millimetres, counts of 32nds of an inch, and counts of thousandths of an inch. Retain original inputs/units and normalize for calculations. Exact conversions: 1 mile = 1.609344 km; 1 inch = 25.4 mm; N/32 inch = N × 25.4/32 mm; N thousandths = N × 0.0254 mm. Round displays only, not stored observations or intermediate arithmetic.
+Vehicles display miles or kilometres. Vehicle fuel units offer litres (initial selection), US gallons, and Imperial gallons, distinctly labelled. Each fueling retains its entered quantity and unit; changing setup affects new entries only. Normalize fuel quantities to litres for the economy formulas below. Oil top-ups use litres. Depth entry supports millimetres, counts of 32nds of an inch, and counts of thousandths of an inch when tread entry is implemented. Keep units next to their relevant car measurement rather than introducing unrelated setup fields. Retain original inputs/units and normalize for calculations. Exact conversions: 1 mile = 1.609344 km; 1 inch = 25.4 mm; N/32 inch = N × 25.4/32 mm; N thousandths = N × 0.0254 mm. Round displays only, not stored observations or intermediate arithmetic.
 
 ### 5. Interaction and configurable maintenance
 
-Start at vehicle selection/creation. The vehicle home shows latest known mileage with date, upcoming/due maintenance, tires, fueling, and insufficient-evidence states. Every summary area leads to its details and supporting history. Require only a vehicle name and odometer units; omit owner/contact information from default setup.
+Start at vehicle selection/creation. The vehicle home shows latest known mileage with date and supporting history, adding maintenance, tire and fueling summaries as their slices ship. Every available summary area leads to working details. Setup shows name, odometer units and fuel units; make/model/year/notes sit inside native Optional details, collapsed on creation and expanded on edit. Open the disclosure before focusing an invalid optional field. Keep stable IDs in the background. Offer confirmed deletion while editing an existing vehicle. Omit owner/contact information.
 
 Dated entry supports completed work, inspections, oil changes, oil life, oil level, top-ups, tire movements/measurements, fueling, and standalone odometers. Support historical backfill and absent optional facts. Allow inspection/edit/removal with effects on history and pending changes visible.
 
@@ -209,7 +216,7 @@ For vehicle calendar estimates, use the positive driving rate between the latest
 
 ### 7. Tire history and forecasts
 
-Each tire retains identity, brand/model, measurements, and position history. A seasonal swap selects the incoming set and assigns individuals to front-left/front-right/rear-left/rear-right; optional measurements use the same date/mileage defaults. Rotations use that position layout.
+Each tire retains identity, brand/model, measurements, and position history. Change tires expands into a seasonal swap that selects the incoming set and assigns individuals to front-left/front-right/rear-left/rear-right. One complete swap/rotation is a single action with its own explicitly entered date/mileage; separate tread measurements start blank. Rotations use that position layout. Earlier simple tire-change notes must not fabricate individual tire placements.
 
 Sum known installed odometer differences for distance at each position. Rotation changes position periods, retaining accumulated distance. Off-vehicle distance is zero; unknown spans remain unknown. Time at position respects date precision and may be a range.
 
@@ -264,7 +271,7 @@ Track the snapshot actually sent by an in-flight save. Its success does not mark
 
 The user accepts the race in nearly simultaneous device saves: Gist writes lack documented atomic compare-and-swap. Pre-save merging, local recovery copies, and Gist history reduce loss and support recovery, but are not an atomic cross-device guarantee. The authentication Worker does not coordinate saves.
 
-Exports preserve format/version, IDs, settings, units, date precision, and deletion information. Import app-exported JSON, validate fully, preview additions/conflicts, and merge by default. Reimport is idempotent by ID. Full replacement is separate and first retains a recovery copy; abort if that cannot succeed. Invalid references, malformed data, or unsupported newer versions cannot overwrite history. Older schemas require explicit tested migrations. Arbitrary spreadsheets and the scaffold's incomplete draft format are not assumed compatible.
+Exports preserve format/version, IDs, settings, units, date precision, and deletion information. Import app-exported JSON, validate fully, preview additions/conflicts, and merge by default. Reimport is idempotent by ID. Full replacement is separate and first retains a recovery copy; abort if that cannot succeed. Invalid references, malformed data, or unsupported newer versions cannot overwrite history. Support only the schema versions explicitly implemented; migration of early development versions is optional under the owner's reset allowance above. Arbitrary spreadsheets and the scaffold's incomplete draft format are not assumed compatible.
 
 Expired/revoked auth, failed networking, wrong account, missing Gist, malformed data, and truncated responses must not clear history or silently overwrite remote data. Fetch complete supported content or refuse; never treat truncated content as complete. Keep credentials off arbitrary URLs found in imports. Account/Gist changes explicitly select collection/baseline and cannot silently upload another account's work.
 
@@ -305,6 +312,11 @@ Use the highest meaningful interface for each behavior. Focused numerical tests 
 | Scenario | Expected observable result |
 | --- | --- |
 | Create a 15-year-old vehicle with no mileage or previous service records. | Name/units suffice; prior history stays unknown and future observations establish a baseline. |
+| Rename a vehicle, then reopen it. | The Base36 timestamp ID and linked history remain unchanged; same-millisecond local creations receive distinct IDs. |
+| Delete a vehicle with fueling and maintenance history. | Confirmation identifies the car and its history; Cancel preserves it; confirmed deletion leaves other vehicles untouched and retains deletion markers. |
+| Add an oil change after entering another car action. | Its native date and numeric odometer inputs are blank, with no copied date or mileage. |
+| Change setup from US gallons to litres after saving a fill-up. | The older fill-up retains its US-gallon quantity; only new entry units follow the new preference. |
+| Create a car without optional identifying details. | Optional details stays collapsed; native keyboard expansion reveals make/model/year/notes, and invalid hidden fields reopen for correction. |
 | Insert/correct an old service or tire movement. | Recompute chronology, installed distance, and forecasts; entry time does not determine order. |
 | Approximate dates overlap ambiguously. | Preserve precision and show ranges/unavailable reasons rather than invented dates/order. |
 | Add an inspection, oil-level check, or top-up. | History grows without resetting the replacement/oil-change interval. |

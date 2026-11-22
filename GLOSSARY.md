@@ -16,22 +16,29 @@ _Avoid_: Car profile
 A record of completed maintenance on a vehicle, whether performed by its owner or a mechanic.
 _Avoid_: Reminder, forecast
 
-**Observation**:
+**Car action**:
+Something done to or checked on a vehicle, such as fueling, changing oil, changing tires, replacing a filter, inspecting brakes, or reading the odometer.
+
+**Check / inspection**:
 A recorded inspection or measurement of a vehicle or maintenance item, which does not itself establish that maintenance was performed.
-_Avoid_: Replacement
+_Avoid_: Generic observation as an entry action, replacement
+
+**Missing records**:
+A known period for which a vehicle's service, fueling, or measurement records are unavailable; this does not assert that no work occurred.
+_Avoid_: Gap as an unexplained user-facing label
 
 **Maintenance history**:
 The collected maintenance records for a vehicle.
 
 **Vehicle history**:
-The collected maintenance records, observations, tire movements, and fueling records associated with a vehicle.
+The collected maintenance records, checks/inspections, tire movements, and fueling records associated with a vehicle.
 
 **Fueling record**:
-A record of fuel added to a vehicle, retaining the known date, odometer reading, and litres added; some historical details may be unknown.
+A record of fuel added to a vehicle, retaining the known date, odometer reading, quantity and its units (litres, US gallons, or Imperial gallons); some historical details may be unknown.
 _Avoid_: Fuel consumed, since fuel added is not necessarily fuel consumed over the preceding distance
 
 **Odometer reading**:
-A dated observation of the vehicle's displayed accumulated distance, whether recorded during fueling, maintenance, or another observation.
+A dated measurement of the vehicle's displayed accumulated distance, whether recorded during fueling, maintenance, or another car check.
 _Avoid_: Fueling mileage when referring to readings from all event types
 
 **Fuel economy**:

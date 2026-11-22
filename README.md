@@ -46,4 +46,4 @@ On Linux, install browsers with `npx playwright install --with-deps chromium web
 - [History contracts and UI verification ledger](documentation/history.md)
 - [Implementation tickets](.scratch/first-usable-version-build/issues/01-create-and-reopen-vehicles.md)
 
-GitHub Pages publishes `main` → `/docs`. Run the checks before integrating/pushing a ticket, then verify the deployed commit and assets with `node scripts/verify-pages.mjs <full-commit-SHA>` and run the browser journeys against the live site. The release contract documents this workflow and the non-destructive data compatibility requirements for subsequent tickets.
+GitHub Pages publishes `main` → `/docs`. Run the checks before integrating/pushing a ticket, then verify the deployed commit and assets with `node scripts/verify-pages.mjs <full-commit-SHA>` and run the browser journeys against the live site. The release contract documents this workflow. During early development the owner permits schema-version resets instead of migrations; disclose any reset in release notes. The current release retains earlier data.
