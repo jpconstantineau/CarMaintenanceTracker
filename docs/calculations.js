@@ -18,7 +18,13 @@ export function mileageEvidence(collection, vehicleId) {
   for (let i = 0; i < points.length; i++) {
     for (const b of points.slice(i + 1)) {
       const a = points[i];
-      if (Math.abs(a.value - b.value) < 1e-8) continue;
+      if (Math.abs(a.value - b.value) < 1e-8) {
+        if (a.end >= b.start && (a.date.length < 10 || b.date.length < 10)) issues.push({
+          code: 'ambiguous', recordIds: [a.recordId, b.recordId],
+          message: 'Equal mileage does not establish order within overlapping approximate dates. Review dates if known.',
+        });
+        continue;
+      }
       const code = a.end < b.start && a.value > b.value ? 'decrease' :
         a.start === a.end && b.start === b.end && a.start === b.start ? 'same-day' : null;
       if (code) issues.push({ code, recordIds: [a.recordId, b.recordId], message: code === 'decrease' ?
@@ -70,10 +76,14 @@ export function summarizeVehicle(collection, vehicleId) {
   const vehicle = getVehicle(collection, vehicleId);
   const evidence = mileageEvidence(collection, vehicleId);
   const latest = [...evidence.points].sort((a, b) => a.value - b.value || a.end - b.end || a.start - b.start).at(-1);
+  const latestReadings = latest ? evidence.points.filter(point => Math.abs(point.value - latest.value) < 1e-8) : [];
+  const latestDates = [...new Set(latestReadings.filter(point => !latestReadings.some(other => other.start > point.end)).map(point => point.date))].sort();
+  const conflicting = evidence.issues.some(issue => issue.code !== 'ambiguous');
   return {
     vehicle,
-    odometer: evidence.issues.length ? { value: null, unit: vehicle.odometerUnit, date: null, reason: 'Conflicting mileage evidence — review vehicle history.' } :
-      latest ? { value: latest.value, unit: latest.unit, date: latest.date, reason: null } :
+    odometer: conflicting ? { value: null, unit: vehicle.odometerUnit, date: null, reason: 'Conflicting mileage evidence — review vehicle history.' } :
+      latest ? { value: latest.value, unit: latest.unit, date: latestDates.length === 1 ? latestDates[0] : null,
+        reason: latestDates.length === 1 ? null : `Latest date uncertain (${latestDates.join('; ')}). Review vehicle history.` } :
       { value: null, unit: vehicle.odometerUnit, date: null, reason: 'No odometer readings recorded.' },
     history: { count: collection.records.filter(record => record.vehicleId === vehicleId).length, reason: 'Earlier maintenance history is unknown.' },
   };

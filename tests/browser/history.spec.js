@@ -76,18 +76,28 @@ test('partial observations, known gaps and contradictions remain reviewable at n
   await page.getByLabel('Default date').fill('2025-01-01');
   await page.getByLabel('Default odometer').fill('9000');
   await page.getByRole('button', { name: 'Add odometer reading', exact: true }).click();
+  await page.getByLabel('Default date').fill('2026-01-01');
+  await page.getByLabel('Default odometer').fill('8000');
+  await page.getByRole('button', { name: 'Add odometer reading', exact: true }).click();
   await page.getByRole('button', { name: 'Save records', exact: true }).click();
-  await expect(page.locator('#history-list > li')).toHaveCount(4);
-  await expect(page.locator('#history-list').getByText('Mileage decreases across recorded dates. Review these readings.')).toHaveCount(2);
+  await expect(page.locator('#history-list > li')).toHaveCount(5);
+  await expect(page.locator('#history-list').getByText('Mileage decreases across recorded dates. Review these readings.')).toHaveCount(3);
   await page.getByRole('button', { name: 'Vehicle summary', exact: true }).click();
   await expect(page.locator('#summary-mileage')).toContainText('Conflicting mileage evidence');
   await page.reload();
   await page.getByRole('button', { name: 'View history', exact: true }).click();
-  await expect(page.locator('#history-list > li')).toHaveCount(4);
+  await expect(page.locator('#history-list > li')).toHaveCount(5);
 });
 
 test('failed history transaction retains editable drafts and retries without duplicates', async ({ page }) => {
   await openVehicle(page);
+  await page.getByRole('button', { name: 'All vehicles', exact: true }).click();
+  await page.getByRole('button', { name: 'Add vehicle', exact: true }).click();
+  await page.getByLabel('Vehicle name (required)').fill('Correction target');
+  await page.getByLabel('Kilometres (km)', { exact: true }).check();
+  await page.getByRole('button', { name: 'Create vehicle', exact: true }).click();
+  await page.getByRole('button', { name: 'All vehicles', exact: true }).click();
+  await page.getByRole('button', { name: 'History car', exact: true }).click();
   await page.getByRole('button', { name: 'Record history', exact: true }).click();
   await page.getByLabel('Default date').fill('2024-01-02');
   await page.getByRole('button', { name: 'Add observation', exact: true }).click();
@@ -107,14 +117,33 @@ test('failed history transaction retains editable drafts and retries without dup
   const savedBeforeRetry = await page.evaluate(async () => (await (await import('./storage.js')).createLocalStorage().load()).collection);
   expect(savedBeforeRetry.records).toHaveLength(0);
   await page.locator('.record-editor').getByLabel('Notes (optional)').fill('Corrected after failure');
+  await page.locator('.record-editor').getByLabel('Vehicle', { exact: true }).selectOption({ label: 'Correction target' });
   await page.getByRole('button', { name: 'Retry saving history', exact: true }).click();
   await expect(page.locator('#save-status')).toHaveText('Saved on this device.');
+  await expect(page.locator('#history-list > li')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Vehicle summary', exact: true }).click();
+  await page.getByRole('button', { name: 'All vehicles', exact: true }).click();
+  await page.getByRole('button', { name: 'Correction target', exact: true }).click();
   await page.reload();
   await page.getByRole('button', { name: 'View history', exact: true }).click();
   await expect(page.locator('#history-list > li')).toHaveCount(1);
   await expect(page.locator('#history-list')).toContainText('Corrected after failure');
   await page.getByRole('button', { name: 'Edit record 1', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Add observation', exact: true })).toBeHidden();
+});
+
+test('equal readings keep known mileage while exposing an uncertain latest date @live', async ({ page }) => {
+  await openVehicle(page);
+  await page.getByRole('button', { name: 'Record history', exact: true }).click();
+  await page.getByLabel('Default date').fill('2024');
+  await page.getByLabel('Default odometer').fill('100');
+  await page.getByRole('button', { name: 'Add observation', exact: true }).click();
+  await page.getByLabel('Default date').fill('2024-06');
+  await page.getByRole('button', { name: 'Add observation', exact: true }).click();
+  await page.getByRole('button', { name: 'Save records', exact: true }).click();
+  await expect(page.locator('#history-list').getByText('Equal mileage does not establish order within overlapping approximate dates. Review dates if known.')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Vehicle summary', exact: true }).click();
+  await expect(page.locator('#summary-mileage')).toHaveText('100 km — Latest date uncertain (2024; 2024-06). Review vehicle history.');
 });
 
 test('keyboard entry keeps independent vehicle defaults and rejects a partial invalid session @live', async ({ page }) => {

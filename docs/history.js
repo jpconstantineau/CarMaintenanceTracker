@@ -209,8 +209,8 @@ export function getRecord(collection, recordId) {
 
 export function updateRecord(collection, recordId, changes) {
   const previous = getRecord(collection, recordId);
-  const immutable = ['id', 'vehicleId', 'kind', 'createdAt', 'updatedAt'];
-  requireValue(changes !== null && typeof changes === 'object' && Object.keys(changes).every(key => !immutable.includes(key)), 'Record identity, kind, vehicle, and edit metadata cannot be replaced.');
+  const immutable = ['id', 'kind', 'createdAt', 'updatedAt'];
+  requireValue(changes !== null && typeof changes === 'object' && Object.keys(changes).every(key => !immutable.includes(key)), 'Record identity, kind, and edit metadata cannot be replaced.');
   const next = structuredClone(collection);
   next.records[next.records.findIndex(record => record.id === recordId)] = { ...previous, ...changes, updatedAt: new Date().toISOString() };
   return validateCollection(next);

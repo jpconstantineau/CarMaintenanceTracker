@@ -130,3 +130,31 @@ test('invalid partial sessions are atomic and unknown values remain distinct fro
   assert.equal(History.getRecord(changedUnits.collection, saved.recordIds[0]).odometerUnit, 'km');
   assert.deepEqual(deserialize(serialize(saved.collection)), saved.collection);
 });
+
+test('correcting a record vehicle preserves its identity and leaves sibling records alone', () => {
+  const first = vehicle();
+  const second = History.saveVehicle(first.collection, { name: 'Truck', odometerUnit: 'mi' });
+  const saved = History.saveSession(second.collection, { vehicleId: first.vehicleId, date: '2020', odometerUnit: 'km' }, [
+    { kind: 'observation', notes: 'Wrong vehicle selected' }, { kind: 'odometer', odometer: 123 },
+  ]);
+  const corrected = History.updateRecord(saved.collection, saved.recordIds[0], { vehicleId: second.vehicleId });
+  assert.equal(History.listRecords(corrected, second.vehicleId)[0].id, saved.recordIds[0]);
+  assert.deepEqual(History.listRecords(corrected, first.vehicleId), [saved.collection.records[1]]);
+  assert.throws(() => History.updateRecord(corrected, saved.recordIds[0], { vehicleId: crypto.randomUUID() }));
+});
+
+test('equal mileage is nonconflicting but overlapping approximate dates still have unknown order', () => {
+  const { collection, vehicleId } = vehicle();
+  const saved = History.saveSession(collection, { vehicleId, odometerUnit: 'km', odometer: 100 }, [
+    { kind: 'observation', date: '2024' }, { kind: 'observation', date: '2024-06' },
+  ]);
+  assert.equal(mileageEvidence(saved.collection, vehicleId).issues[0].code, 'ambiguous');
+  assert.equal(vehicleHistory(saved.collection, vehicleId).issues[0].code, 'ambiguous');
+  const summary = summarizeVehicle(saved.collection, vehicleId);
+  assert.equal(summary.odometer.value, 100);
+  assert.equal(summary.odometer.date, null);
+  assert.match(summary.odometer.reason, /Latest date uncertain/);
+  assert.match(summary.odometer.reason, /2024-06/);
+  const later = History.saveSession(saved.collection, { vehicleId, odometerUnit: 'km', odometer: 100 }, [{ kind: 'odometer', date: '2025-01-01' }]);
+  assert.equal(summarizeVehicle(later.collection, vehicleId).odometer.date, '2025-01-01');
+});

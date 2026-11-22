@@ -84,7 +84,7 @@ export async function start(document, storage) {
     byId('vehicle-description').hidden = !byId('vehicle-description').textContent;
     byId('summary-units').textContent = vehicle.odometerUnit === 'km' ? 'Kilometres (km)' : 'Miles (mi)';
     byId('summary-mileage').textContent = summary.odometer.value === null ? `Unknown — ${summary.odometer.reason}` :
-      `${mileageLabel(summary.odometer.value, summary.odometer.unit)} — ${dateLabel(summary.odometer.date)}`;
+      `${mileageLabel(summary.odometer.value, summary.odometer.unit)} — ${summary.odometer.date ? dateLabel(summary.odometer.date) : summary.odometer.reason}`;
     byId('summary-history').textContent = `${summary.history.count ? `${summary.history.count} records.` : 'No entries yet.'} ${summary.history.reason}`;
     byId('summary-notes').textContent = vehicle.notes || 'No notes added.';
     screen('vehicle-summary', focus ? 'vehicle-title' : null);
@@ -236,8 +236,9 @@ export async function start(document, storage) {
       row.append(element('h3', `${kindLabels[record.kind]} — ${dateLabel(record.date)}`));
       row.append(element('p', record.kind === 'gap' ? `${record.historyType} history missing through ${dateLabel(record.endDate)}` : mileageLabel(record.odometer, record.odometerUnit)));
       if (record.notes) row.append(element('p', record.notes, 'record-notes'));
-      for (const issue of history.issues.filter(issue => issue.recordIds.includes(record.id))) {
-        row.append(element('p', issue.message, 'review-note'));
+      const messages = new Set(history.issues.filter(issue => issue.recordIds.includes(record.id)).map(issue => issue.message));
+      for (const message of messages) {
+        row.append(element('p', message, 'review-note'));
       }
       const actions = element('div', undefined, 'actions');
       actions.append(button(`Edit record ${index + 1}`, () => openHistoryEditor(record.id)), button(`Remove record ${index + 1}`, async () => {
@@ -300,7 +301,7 @@ export async function start(document, storage) {
     if (record) row.dataset.recordId = record.id;
     row.append(element('legend', kindLabels[kind]));
     historyField(row, 'vehicleId', 'Vehicle', record?.vehicleId ?? vehicle.id, {
-      choices: snapshot.collection.vehicles.map(value => [value.id, value.name]), disabled: Boolean(record),
+      choices: snapshot.collection.vehicles.map(value => [value.id, value.name]),
     });
     const date = historyField(row, 'date', kind === 'gap' ? 'Start date (required)' : 'Date (required)', record?.date ?? byId('default-date').value, { required: true });
     if (kind === 'gap') {
@@ -376,7 +377,6 @@ export async function start(document, storage) {
       if ('odometer' in details) details.odometer = details.odometer === '' ? null : Number(details.odometer);
       try {
         if (row.dataset.recordId) {
-          delete details.vehicleId;
           collection = updateRecord(collection, row.dataset.recordId, details);
         } else {
           const result = saveSession(collection, {}, [{ kind: row.dataset.kind, ...details }]);
