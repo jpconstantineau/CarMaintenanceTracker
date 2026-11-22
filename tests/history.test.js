@@ -53,8 +53,10 @@ test('deletion markers survive serialization without reusing identities', () => 
 
 test('v1 fixture preserves records, deletion markers, original values and identity', async () => {
   const fixture = JSON.parse(await readFile(new URL('./fixtures/collection-v1.json', import.meta.url)));
-  assert.deepEqual(deserialize(serialize(fixture)), fixture);
-  const result = saveVehicle(fixture, { ...details, name: 'Another car' });
+  const migrated = deserialize(JSON.stringify(fixture));
+  assert.deepEqual(migrated, { ...fixture, schemaVersion: 2 });
+  assert.deepEqual(deserialize(serialize(migrated)), migrated);
+  const result = saveVehicle(migrated, { ...details, name: 'Another car' });
   assert.deepEqual(result.collection.vehicles[0], fixture.vehicles[0]);
   assert.deepEqual(result.collection.tombstones, fixture.tombstones);
 });
@@ -62,7 +64,7 @@ test('v1 fixture preserves records, deletion markers, original values and identi
 test('malformed, newer, duplicate, unsupported and credential-bearing collections are refused', () => {
   const { collection, vehicleId } = saveVehicle(createCollection(), details);
   for (const change of [
-    value => { value.schemaVersion = 2; },
+    value => { value.schemaVersion = 99; },
     value => { value.token = 'not-a-real-token'; },
     value => { value.vehicles.push(value.vehicles[0]); },
     value => { value.vehicles[0].forecast = 0; },

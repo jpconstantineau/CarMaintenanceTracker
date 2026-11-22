@@ -9,8 +9,11 @@ A vanilla HTML/CSS/JavaScript app for personal vehicle maintenance history, host
 - Automatically save recorded details locally in IndexedDB and reopen the last selected vehicle.
 - See honest missing-mileage/history states and recover from failed local saves without losing the open form.
 - Choose System, Light or Dark in the header; the preference persists on this device.
+- Record odometer readings, general observations, and known gaps, using exact dates or month/year precision.
+- Enter several independent records with shared defaults; backfill, correct, or remove them and review mileage conflicts.
+- Inspect dated mileage evidence and reopen factual history, including collections saved by the first release.
 
-This first slice stores vehicle details in this browser on this device. Maintenance entry, tires, fueling, calculations, JSON transfer and GitHub Gist sync are future tickets. The intended cloud storage remains the user's own GitHub Gist; authentication will use a small Cloudflare Worker.
+Vehicle details and history are stored in this browser on this device. Maintenance-item entry, tires, fueling, forecasts, JSON transfer and GitHub Gist sync are future tickets. The intended cloud storage remains the user's own GitHub Gist; authentication will use a small Cloudflare Worker.
 
 ## Run and test
 
@@ -36,6 +39,7 @@ On Linux, install browsers with `npx playwright install --with-deps chromium web
 - [Design guide](DESIGN.md) for themes, color, layout, typography and accessibility
 - [Local module, persistence and release contracts](documentation/vehicle-foundation.md)
 - [UI purpose and verification ledger](documentation/vehicle-ui-ledger.md)
+- [History contracts and UI verification ledger](documentation/history.md)
 - [Implementation tickets](.scratch/first-usable-version-build/issues/01-create-and-reopen-vehicles.md)
 
 GitHub Pages publishes `main` → `/docs`. Run the checks before integrating/pushing a ticket, then verify the deployed commit and assets with `node scripts/verify-pages.mjs <full-commit-SHA>` and run the browser journeys against the live site. The release contract documents this workflow and the non-destructive data compatibility requirements for subsequent tickets.

@@ -1,4 +1,4 @@
-import { validateCollection } from './history.js';
+import { validateCollection, migrateCollection } from './history.js';
 
 export const DATABASE_NAME = 'car-maintenance-tracker';
 const DATABASE_VERSION = 1;
@@ -8,9 +8,7 @@ export function serialize(collection) {
 }
 
 export function deserialize(json) {
-  // Version one is the first persisted release. Future versions must migrate
-  // here, explicitly and without dropping original IDs or factual observations.
-  return validateCollection(JSON.parse(json));
+  return migrateCollection(JSON.parse(json));
 }
 
 function validateSnapshot(snapshot) {

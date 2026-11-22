@@ -1,5 +1,7 @@
 # Vehicle UI purpose and verification ledger
 
+The [history ledger](history.md) extends this foundation ledger for the dated-entry/history screens, summary actions, and their added styles.
+
 Task: create, identify, edit and reopen a vehicle without losing or mixing its details. Success is the correct saved vehicle, an honest description of missing history, and editable work retained after a failed save. The user also explicitly requested a persistent header control for System / Light / Dark.
 
 Scope: every element in `docs/index.html`, generated vehicle buttons in `docs/interface.js`, and every authored declaration in `docs/styles.css`. Repeated fields and rows share contracts below. Exact palette, typography, spacing and corner values come from [DESIGN.md](../DESIGN.md). There are no imported styles or downloaded fonts.

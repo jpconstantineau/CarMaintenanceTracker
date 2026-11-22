@@ -1,5 +1,7 @@
 # Local vehicle foundation
 
+The first-release contract below is retained for compatibility context. [Dated history](history.md) documents the schema 2 extension, non-destructive v1 migration, additional public operations, and current history UI verification.
+
 Ticket: `.scratch/first-usable-version-build/issues/01-create-and-reopen-vehicles.md`.
 
 ## Public module interfaces

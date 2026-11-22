@@ -211,12 +211,21 @@ test('a prior v1 collection reopens and edits without replacing IDs, notes or de
   await page.goto('./');
   await expect(page.getByRole('status')).toHaveText('No vehicles saved yet.');
   await page.evaluate(async collection => {
-    const { createLocalStorage } = await import(new URL('storage.js', location.href));
-    await createLocalStorage().save({ collection, selectedVehicleId: collection.vehicles[0].id, revision: 0 });
+    // Seed exactly what the preceding release stored, before the new loader runs.
+    await new Promise((resolve, reject) => {
+      const request = indexedDB.open('car-maintenance-tracker');
+      request.onsuccess = () => {
+        const db = request.result;
+        const tx = db.transaction('workspace', 'readwrite');
+        tx.objectStore('workspace').put({ json: JSON.stringify(collection), selectedVehicleId: collection.vehicles[0].id, revision: 1 }, 'active');
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onabort = () => reject(tx.error);
+      };
+    });
   }, fixture);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Older Civic' })).toBeVisible();
-  expect((await loadSnapshot(page)).collection).toEqual(fixture);
+  expect((await loadSnapshot(page)).collection).toEqual({ ...fixture, schemaVersion: 2 });
   await page.getByRole('button', { name: 'All vehicles' }).click();
   await createVehicle(page, 'Another vehicle');
   const result = (await loadSnapshot(page)).collection;
