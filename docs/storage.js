@@ -1,4 +1,4 @@
-import { validateCollection, migrateCollection } from './history.js?v=cf4ee93be591';
+import { validateCollection, migrateCollection } from './history.js?v=91ac1525558b';
 
 export const DATABASE_NAME = 'car-maintenance-tracker';
 const DATABASE_VERSION = 1;

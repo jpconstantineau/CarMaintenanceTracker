@@ -70,7 +70,7 @@ test('deletion markers survive serialization without reusing identities', () => 
 test('v1 fixture preserves records, deletion markers, original values and identity', async () => {
   const fixture = JSON.parse(await readFile(new URL('./fixtures/collection-v1.json', import.meta.url)));
   const migrated = deserialize(JSON.stringify(fixture));
-  assert.deepEqual(migrated, { ...fixture, schemaVersion: 3, vehicles: fixture.vehicles.map(vehicle => ({ ...vehicle, fuelUnit: 'L' })) });
+  assert.deepEqual(migrated, { ...fixture, schemaVersion: 4, items: [], vehicles: fixture.vehicles.map(vehicle => ({ ...vehicle, fuelUnit: 'L' })) });
   assert.deepEqual(deserialize(serialize(migrated)), migrated);
   const result = saveVehicle(migrated, { ...details, name: 'Another car' });
   assert.deepEqual(result.collection.vehicles[0], { ...fixture.vehicles[0], fuelUnit: 'L' });

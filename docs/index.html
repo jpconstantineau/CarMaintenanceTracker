@@ -13,7 +13,7 @@
       } catch { /* The system theme remains available when storage is blocked. */ }
     </script>
     <title>Car Maintenance Tracker</title>
-    <link rel="stylesheet" href="./styles.css?v=cf4ee93be591">
+    <link rel="stylesheet" href="./styles.css?v=91ac1525558b">
   </head>
   <body>
     <header>
@@ -57,6 +57,33 @@
           <button id="view-history" type="button" class="secondary">View history</button>
           <button id="edit-vehicle" type="button" class="secondary">Edit vehicle details</button>
         </div>
+        <section class="maintenance-section" aria-labelledby="maintenance-title">
+          <h3 id="maintenance-title">Maintenance items</h3>
+          <ul id="maintenance-list"></ul>
+          <button id="add-item" type="button" class="secondary">Add maintenance item</button>
+        </section>
+      </section>
+
+      <section id="item-view" aria-labelledby="item-title" hidden>
+        <button id="item-summary" type="button" class="secondary">Vehicle summary</button>
+        <h2 id="item-title" tabindex="-1"></h2>
+        <div id="item-details"></div>
+        <div id="item-actions" class="actions"></div>
+      </section>
+
+      <section id="item-editor" aria-labelledby="item-editor-title" hidden>
+        <h2 id="item-editor-title" tabindex="-1"></h2>
+        <form id="item-form" aria-labelledby="item-editor-title" novalidate>
+          <fieldset id="item-fields">
+            <legend id="item-vehicle"></legend>
+            <div id="item-controls"></div>
+            <div class="actions">
+              <button id="submit-item" type="submit">Save item</button>
+              <button id="cancel-item" type="button" class="secondary">Cancel</button>
+            </div>
+          </fieldset>
+          <p id="item-error" role="alert" tabindex="-1"></p>
+        </form>
       </section>
 
       <section id="history-view" aria-labelledby="history-title" hidden>
@@ -151,6 +178,6 @@
       </section>
       <noscript><p>JavaScript is needed to open and save your vehicles on this device.</p></noscript>
     </main>
-    <script type="module" src="./app.js?v=cf4ee93be591"></script>
+    <script type="module" src="./app.js?v=91ac1525558b"></script>
   </body>
 </html>

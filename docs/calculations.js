@@ -1,4 +1,4 @@
-import { getVehicle, listRecords, dateBounds } from './history.js?v=cf4ee93be591';
+import { getVehicle, listRecords, listItems, dateBounds } from './history.js?v=91ac1525558b';
 
 function distance(value, from, to) {
   if (from === to) return value;
@@ -87,4 +87,76 @@ export function summarizeVehicle(collection, vehicleId) {
       { value: null, unit: vehicle.odometerUnit, date: null, reason: 'No odometer readings recorded.' },
     history: { count: collection.records.filter(record => record.vehicleId === vehicleId).length, reason: 'Earlier maintenance history is unknown.' },
   };
+}
+
+function addMonths(key, months) {
+  const year = Math.floor(key / 10000), month = Math.floor(key / 100) % 100, day = key % 100;
+  const total = year * 12 + month - 1 + months;
+  const nextYear = Math.floor(total / 12), nextMonth = total % 12 + 1;
+  if (nextYear > 9999) return null;
+  const prefix = `${String(nextYear).padStart(4, '0')}-${String(nextMonth).padStart(2, '0')}`;
+  return `${prefix}-${String(Math.min(day, dateBounds(prefix).end % 100)).padStart(2, '0')}`;
+}
+
+// Evaluation date is supplied by the caller; no clocks or persisted forecasts.
+export function maintenanceSummary(collection, vehicleId, asOf) {
+  const today = dateBounds(asOf);
+  if (asOf.length !== 10) throw new Error('Use an exact evaluation date.');
+  const vehicle = getVehicle(collection, vehicleId);
+  const history = vehicleHistory(collection, vehicleId);
+  const mileage = summarizeVehicle(collection, vehicleId).odometer;
+  const evidence = mileageEvidence(collection, vehicleId);
+  return listItems(collection, vehicleId).map(item => {
+    const records = history.records.filter(record => record.itemId === item.id);
+    const services = records.filter(record => record.kind === 'maintenance');
+    const tracking = item.tracking;
+    const result = { item, records, serviceId: null, dueMileage: null, unit: vehicle.odometerUnit, dueDate: null,
+      status: 'unavailable', reasons: [], condition: tracking.condition };
+    if (!tracking.distance && !tracking.months && !tracking.condition) return { ...result, status: 'history-only' };
+    if (tracking.condition) result.reasons.push('Condition threshold configured; no condition measurement result is available.');
+    const later = (a, b) => {
+      if (dateBounds(a.date).start > dateBounds(b.date).end) return true;
+      if (dateBounds(a.date).end < dateBounds(b.date).start) return false;
+      return a.odometer !== null && b.odometer !== null &&
+        distance(a.odometer, a.odometerUnit, vehicle.odometerUnit) > distance(b.odometer, b.odometerUnit, vehicle.odometerUnit) &&
+        !evidence.issues.some(issue => issue.code !== 'ambiguous' && issue.recordIds.includes(a.id) && issue.recordIds.includes(b.id));
+    };
+    const candidates = services.filter(service => !services.some(other => other !== service && later(other, service)));
+    if (candidates.length !== 1) {
+      result.reasons.push(candidates.length ? 'Last completed service is ambiguous. Review item history.' : 'Last completed service is unknown.');
+      return result;
+    }
+    const service = candidates[0], bounds = dateBounds(service.date);
+    result.serviceId = service.id;
+    const gap = history.records.some(record => record.kind === 'gap' && ['all', 'maintenance'].includes(record.historyType) &&
+      dateBounds(record.endDate).end >= bounds.start && dateBounds(record.date).start <= today.end);
+    if (gap || bounds.start > today.end) {
+      result.reasons.push(gap ? 'Missing maintenance records may include later service. Review vehicle history.' : 'Completed service is dated after the evaluation date.');
+      return result;
+    }
+    const states = [];
+    if (tracking.distance) {
+      const conflict = evidence.issues.some(issue => issue.code !== 'ambiguous');
+      if (service.odometer === null || conflict) {
+        states.push('unavailable');
+        result.reasons.push(conflict ? 'Conflicting mileage evidence — review vehicle history.' : 'Last service mileage is unknown.');
+      } else {
+        result.dueMileage = distance(service.odometer, service.odometerUnit, vehicle.odometerUnit) + distance(tracking.distance.value, tracking.distance.unit, vehicle.odometerUnit);
+        const futureReading = evidence.points.some(point => point.end > today.end);
+        if (futureReading) result.reasons.push('Mileage evidence extends after the evaluation date. Review dates before using the distance status.');
+        states.push(mileage.value === null || futureReading ? 'unavailable' : mileage.value >= result.dueMileage ? 'due' : 'not-due');
+      }
+    }
+    if (tracking.months) {
+      const earliest = addMonths(bounds.start, tracking.months), latest = addMonths(bounds.end, tracking.months);
+      if (earliest && latest) {
+        result.dueDate = { earliest, latest };
+        states.push(asOf >= latest ? 'due' : asOf < earliest ? 'not-due' : 'uncertain');
+      } else { states.push('unavailable'); result.reasons.push('Due date exceeds the supported calendar.'); }
+    }
+    if (tracking.condition) states.push('unavailable');
+    result.status = states.includes('due') ? 'due' : states.includes('uncertain') ? 'uncertain' :
+      states.includes('unavailable') || !states.length ? 'unavailable' : 'not-due';
+    return result;
+  });
 }

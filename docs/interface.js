@@ -1,5 +1,5 @@
-import { createCollection, getVehicle, saveVehicle, removeVehicle, getRecord, saveSession, updateRecord, removeRecord, HISTORY_TYPES } from './history.js?v=cf4ee93be591';
-import { summarizeVehicle, vehicleHistory } from './calculations.js?v=cf4ee93be591';
+import { createCollection, getVehicle, saveVehicle, removeVehicle, getRecord, saveSession, updateRecord, removeRecord, listItems, saveItem, COMMON_ITEMS, HISTORY_TYPES } from './history.js?v=91ac1525558b';
+import { summarizeVehicle, vehicleHistory, maintenanceSummary } from './calculations.js?v=91ac1525558b';
 
 const dateLabel = date => `${date}${date.length === 4 ? ' (year known)' : date.length === 7 ? ' (month known)' : ''}`;
 const mileageLabel = (value, unit) => value === null ? 'Mileage unknown' : `${new Intl.NumberFormat('en', { maximumFractionDigits: 3 }).format(value)} ${unit}`;
@@ -44,15 +44,17 @@ export async function start(document, storage) {
   let historyEditing = false;
   let removedDraftIds = [];
   let fieldSequence = 0;
+  let editingItemId = null;
+  let historyItemId = null;
 
   function status(message, error = '') {
     byId('save-status').textContent = message;
     byId('storage-error').textContent = error;
-    byId('retry').hidden = !error || !byId('vehicle-editor').hidden || !byId('history-editor').hidden;
+    byId('retry').hidden = !error || !byId('vehicle-editor').hidden || !byId('history-editor').hidden || !byId('item-editor').hidden;
   }
 
   function screen(id, focusId) {
-    for (const name of ['selection', 'vehicle-summary', 'vehicle-editor', 'history-view', 'history-editor']) byId(name).hidden = name !== id;
+    for (const name of ['selection', 'vehicle-summary', 'vehicle-editor', 'history-view', 'history-editor', 'item-view', 'item-editor']) byId(name).hidden = name !== id;
     if (focusId) byId(focusId).focus();
   }
 
@@ -89,6 +91,13 @@ export async function start(document, storage) {
       `${mileageLabel(summary.odometer.value, summary.odometer.unit)} — ${summary.odometer.date ? dateLabel(summary.odometer.date) : summary.odometer.reason}`;
     byId('summary-history').textContent = `${summary.history.count ? `${summary.history.count} records.` : 'No entries yet.'} ${summary.history.reason}`;
     byId('summary-notes').textContent = vehicle.notes || 'No notes added.';
+    const maintenance = byId('maintenance-list');
+    maintenance.replaceChildren();
+    for (const summary of itemSummaries()) {
+      const row = element('li');
+      row.append(button(`${summary.item.name} — details`, () => showItem(summary.item.id)), element('p', dueLabel(summary)));
+      maintenance.append(row);
+    }
     screen('vehicle-summary', focus ? 'vehicle-title' : null);
   }
 
@@ -97,6 +106,7 @@ export async function start(document, storage) {
     pending = true;
     byId('editor-fields').disabled = true;
     byId('history-fields').disabled = true;
+    byId('item-fields').disabled = true;
     status('Saving on this device…');
     try {
       const result = await storage.save(snapshot);
@@ -111,6 +121,7 @@ export async function start(document, storage) {
       busy = false;
       byId('editor-fields').disabled = false;
       byId('history-fields').disabled = false;
+      byId('item-fields').disabled = false;
     }
   }
 
@@ -242,20 +253,182 @@ export async function start(document, storage) {
     return control;
   }
 
-  function showHistory() {
+  function itemSummaries() {
+    const now = new Date();
+    const asOf = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    return maintenanceSummary(snapshot.collection, snapshot.selectedVehicleId, asOf);
+  }
+
+  function dueLabel(summary) {
+    const states = { 'history-only': 'History only', due: 'Due', 'not-due': 'Not due by known mileage and date', uncertain: 'Due date uncertain', unavailable: 'Due status unavailable' };
+    const parts = [states[summary.status]];
+    if (summary.dueMileage !== null) parts.push(`Due at ${mileageLabel(summary.dueMileage, summary.unit)}`);
+    if (summary.dueDate) parts.push(`Due ${summary.dueDate.earliest === summary.dueDate.latest ? summary.dueDate.earliest : `${summary.dueDate.earliest} to ${summary.dueDate.latest}`}`);
+    return parts.join(' · ');
+  }
+
+  function itemAction(kind, item) {
+    return `${kind === 'observation' ? 'Inspect' : item.name.toLowerCase().includes('brake') ? 'Service' : 'Replace'} ${item.name}`;
+  }
+
+  function recordItem(kind, item) {
+    historyItemId = item.id;
+    openHistoryEditor();
+    addDraft(kind, null, item);
+  }
+
+  function showItem(itemId) {
+    if (busy) return;
+    const summary = itemSummaries().find(summary => summary.item.id === itemId);
+    const item = summary.item;
+    editingItemId = itemId;
+    byId('item-title').textContent = item.name;
+    const details = byId('item-details');
+    details.replaceChildren(element('p', dueLabel(summary)));
+    for (const reason of summary.reasons) details.append(element('p', reason));
+    const data = element('dl');
+    const facts = [['Specifications', item.specifications], ['Compatible part numbers', item.compatibleParts], ['Preferred brand', item.preferredBrand], ['Notes', item.notes]];
+    if (item.tracking.distance) facts.push(['Distance interval', mileageLabel(item.tracking.distance.value, item.tracking.distance.unit)]);
+    if (item.tracking.months) facts.push(['Time interval', `${item.tracking.months} months`]);
+    if (item.tracking.condition) {
+      const condition = item.tracking.condition;
+      facts.push(['Condition threshold', `${condition.metric}: ${condition.operator.replaceAll('-', ' ')} ${condition.threshold} ${condition.unit}`]);
+    }
+    if (summary.serviceId) {
+      const service = getRecord(snapshot.collection, summary.serviceId);
+      facts.push(['Last recorded completed service', `${dateLabel(service.date)} · ${mileageLabel(service.odometer, service.odometerUnit)}`]);
+    }
+    for (const [label, value] of facts) if (value) data.append(element('dt', label), element('dd', value));
+    details.append(data);
+    if (item.links.length) {
+      const links = element('ul');
+      for (const url of item.links) {
+        const link = element('a', url); link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+        const row = element('li'); row.append(link); links.append(row);
+      }
+      details.append(element('h3', 'Reference links (open in new tab)'), links);
+    }
+    byId('item-actions').replaceChildren(
+      button(itemAction('maintenance', item), () => recordItem('maintenance', item)),
+      button(itemAction('observation', item), () => recordItem('observation', item)),
+      button('View item history', () => showHistory(itemId)),
+      button('Edit item', () => editItem(itemId)),
+    );
+    screen('item-view', 'item-title');
+  }
+
+  function editItem(itemId = null) {
+    if (busy) return;
+    editingItemId = itemId;
+    dirty = false;
+    const vehicle = getVehicle(snapshot.collection, snapshot.selectedVehicleId);
+    const item = listItems(snapshot.collection, vehicle.id).find(item => item.id === itemId);
+    byId('item-editor-title').textContent = item ? 'Edit maintenance item' : 'Add maintenance item';
+    byId('item-vehicle').textContent = vehicle.name;
+    byId('item-error').textContent = '';
+    byId('submit-item').textContent = 'Save item';
+    const controls = byId('item-controls');
+    controls.replaceChildren();
+    const common = historyField(controls, 'common', 'Common item', '', { choices: [['', 'Custom item'], ...COMMON_ITEMS.map(name => [name, name])] });
+    delete common.dataset.field;
+    const name = historyField(controls, 'name', 'Item name (required)', item?.name ?? '', { required: true });
+    common.addEventListener('change', () => { if (common.value) name.value = common.value; });
+    for (const [key, label] of [['specifications', 'Specifications'], ['compatibleParts', 'Compatible part numbers'], ['preferredBrand', 'Preferred brand'], ['notes', 'Notes'], ['links', 'Reference links (one http/https URL per line, optional)']]) {
+      const control = historyField(controls, key, key === 'links' ? label : `${label} (optional)`, key === 'links' ? item?.links.join('\n') ?? '' : item?.[key] ?? '', { multiline: key !== 'preferredBrand' });
+      if (['links', 'compatibleParts'].includes(key)) {
+        control.setAttribute('autocorrect', 'off'); control.setAttribute('autocapitalize', 'none'); control.spellcheck = false;
+      }
+    }
+    const tracking = item?.tracking;
+    const initialMode = tracking?.condition ? (tracking.distance || tracking.months ? 'combined' : 'condition') : tracking?.distance || tracking?.months ? 'interval' : 'history';
+    const mode = historyField(controls, 'mode', 'Tracking method', initialMode, { choices: [['history', 'History only'], ['interval', 'Distance / time intervals'], ['condition', 'Condition threshold'], ['combined', 'Intervals and condition']] });
+    const intervals = element('fieldset'); intervals.append(element('legend', 'User-configured intervals'));
+    historyField(intervals, 'distance', 'Distance interval (optional)', tracking?.distance?.value ?? '', { numeric: true });
+    historyField(intervals, 'distanceUnit', 'Interval units', tracking?.distance?.unit ?? vehicle.odometerUnit, { choices: [['km', 'Kilometres (km)'], ['mi', 'Miles (mi)']] });
+    const months = historyField(intervals, 'months', 'Time interval (months, optional)', tracking?.months ?? '', { numeric: true });
+    months.step = '1'; months.min = '1'; months.max = '1200';
+    const conditions = element('fieldset'); conditions.append(element('legend', 'User-configured condition'));
+    historyField(conditions, 'metric', 'Condition being measured (required)', tracking?.condition?.metric ?? '', { required: true });
+    historyField(conditions, 'conditionUnit', 'Condition units (required)', tracking?.condition?.unit ?? '', { required: true });
+    historyField(conditions, 'operator', 'Due when condition is', tracking?.condition?.operator ?? 'at-or-below', { choices: [['at-or-below', 'At or below threshold'], ['at-or-above', 'At or above threshold']] });
+    historyField(conditions, 'threshold', 'Condition threshold (required)', tracking?.condition?.threshold ?? '', { numeric: true, required: true });
+    conditions.append(element('p', 'This stores your threshold. A due result also needs a supported condition measurement.'));
+    controls.append(intervals, conditions);
+    function showSettings() {
+      intervals.hidden = intervals.disabled = !['interval', 'combined'].includes(mode.value);
+      conditions.hidden = conditions.disabled = !['condition', 'combined'].includes(mode.value);
+    }
+    mode.addEventListener('change', showSettings);
+    showSettings();
+    byId('retry').hidden = true;
+    screen('item-editor', name.id);
+  }
+
+  byId('item-form').addEventListener('input', event => {
+    clearError(event.target);
+    byId('item-error').textContent = '';
+    dirty = true;
+    byId('save-status').textContent = 'Unsaved item — submit to save on this device.';
+  });
+  byId('item-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (busy) return;
+    const controls = [...byId('item-controls').querySelectorAll('[data-field]')].filter(control => !control.matches(':disabled'));
+    const invalid = controls.find(control => !control.validity.valid);
+    if (invalid) { historyError(invalid, invalid.validationMessage); return; }
+    const values = Object.fromEntries(controls.map(control => [control.dataset.field, control.value]));
+    const intervals = ['interval', 'combined'].includes(values.mode), condition = ['condition', 'combined'].includes(values.mode);
+    if (intervals && values.distance === '' && values.months === '') {
+      historyError(controls.find(control => control.dataset.field === 'distance'), 'Enter a distance or time interval, or choose History only.'); return;
+    }
+    const tracking = {
+      distance: intervals && values.distance !== '' ? { value: Number(values.distance), unit: values.distanceUnit } : null,
+      months: intervals && values.months !== '' ? Number(values.months) : null,
+      condition: condition ? { metric: values.metric, unit: values.conditionUnit, operator: values.operator, threshold: Number(values.threshold) } : null,
+    };
+    try {
+      const details = Object.fromEntries(['name', 'specifications', 'compatibleParts', 'preferredBrand', 'notes'].map(key => [key, values[key]]));
+      const result = saveItem(snapshot.collection, snapshot.selectedVehicleId, { ...details, links: values.links.split(/\r?\n/).map(link => link.trim()).filter(Boolean), tracking }, editingItemId);
+      snapshot.collection = result.collection;
+      editingItemId = result.itemId;
+      if (await persist()) { dirty = false; showItem(result.itemId); }
+      else byId('submit-item').textContent = 'Retry saving item';
+    } catch (error) {
+      const control = controls.find(control => control.dataset.field === error.field);
+      if (control) historyError(control, error.message);
+      else { byId('item-error').textContent = error.message; byId('item-error').focus(); }
+    }
+  });
+  byId('add-item').addEventListener('click', () => editItem());
+  byId('item-summary').addEventListener('click', () => { if (!busy) render(); });
+  byId('cancel-item').addEventListener('click', () => {
+    if (busy) return;
+    dirty = false;
+    render();
+    if (pending) byId('retry').hidden = false;
+    else status('Saved on this device.');
+  });
+
+  function showHistory(itemId = historyItemId) {
+    historyItemId = itemId;
     render(false);
     const vehicle = getVehicle(snapshot.collection, snapshot.selectedVehicleId);
-    byId('history-title').textContent = `History — ${vehicle.name}`;
+    const item = listItems(snapshot.collection, vehicle.id).find(item => item.id === itemId);
+    byId('history-title').textContent = `History — ${item ? `${item.name} — ` : ''}${vehicle.name}`;
     const history = vehicleHistory(snapshot.collection, vehicle.id);
+    if (item) history.records = history.records.filter(record => record.itemId === itemId);
     byId('history-empty').hidden = history.records.length > 0;
     const list = byId('history-list');
     list.replaceChildren();
     history.records.forEach((record, index) => {
       const row = element('li');
-      row.append(element('h3', `${kindLabels[record.kind]} — ${dateLabel(record.date)}`));
+      row.append(element('h3', `${record.action || kindLabels[record.kind]} — ${dateLabel(record.date)}`));
+      if (record.itemId) row.append(element('p', `${kindLabels[record.kind]} · ${listItems(snapshot.collection, record.vehicleId).find(item => item.id === record.itemId).name}`));
       row.append(element('p', record.kind === 'gap' ? `${record.historyType} history missing through ${dateLabel(record.endDate)}` : mileageLabel(record.odometer, record.odometerUnit)));
       if (record.kind === 'fueling') row.append(element('p', `${record.fuelAmount === null ? 'Fuel quantity unknown' : `${record.fuelAmount} ${record.fuelUnit}`} — ${record.tankStatus === 'unknown' ? 'tank status unknown' : `${record.tankStatus} tank`}`));
       if (record.notes) row.append(element('p', record.notes, 'record-notes'));
+      if (record.partUsed) row.append(element('p', `Part used: ${record.partUsed}`));
+      if (record.cost) row.append(element('p', `Cost: ${record.cost.amount} ${record.cost.currency}`));
       const messages = new Set(history.issues.filter(issue => issue.recordIds.includes(record.id)).map(issue => issue.message));
       for (const message of messages) {
         row.append(element('p', message, 'review-note'));
@@ -293,8 +466,8 @@ export async function start(document, storage) {
         control.append(choice);
       }
     } else if (options.multiline) { control.rows = 3; control.maxLength = 5000; }
-    else if (name === 'odometer' || name === 'fuelAmount') { control.type = 'number'; control.min = '0'; control.step = 'any'; control.inputMode = 'decimal'; }
-    else { control.maxLength = 10; }
+    else if (options.numeric || name === 'odometer' || name === 'fuelAmount') { control.type = 'number'; control.min = '0'; control.step = 'any'; control.inputMode = 'decimal'; }
+    else { control.maxLength = options.maxLength ?? 100; }
     control.required = Boolean(options.required);
     control.disabled = Boolean(options.disabled);
     control.value = value ?? '';
@@ -340,15 +513,37 @@ export async function start(document, storage) {
     return control;
   }
 
-  function addDraft(kind, record = null) {
+  function addDraft(kind, record = null, selectedItem = null) {
     const vehicle = getVehicle(snapshot.collection, snapshot.selectedVehicleId);
     const row = element('fieldset', undefined, 'record-editor');
     row.dataset.kind = kind;
     if (record) row.dataset.recordId = record.id;
     row.append(element('legend', kindLabels[kind]));
-    historyField(row, 'vehicleId', 'Vehicle', record?.vehicleId ?? vehicle.id, {
+    const vehicleControl = historyField(row, 'vehicleId', 'Vehicle', record?.vehicleId ?? vehicle.id, {
       choices: snapshot.collection.vehicles.map(value => [value.id, value.name]),
     });
+    if (['maintenance', 'observation'].includes(kind)) {
+      const itemControl = historyField(row, 'itemId', 'Maintenance item (optional)', record?.itemId ?? selectedItem?.id ?? '', { choices: [] });
+      const action = historyField(row, 'action', 'Action performed', record?.action ?? (selectedItem ? itemAction(kind, selectedItem) : ''), { maxLength: 100 });
+      function choices() {
+        const current = itemControl.value;
+        itemControl.replaceChildren();
+        for (const [value, label] of [['', 'Unassigned'], ...listItems(snapshot.collection, vehicleControl.value).map(item => [item.id, item.name])]) {
+          const option = element('option', label); option.value = value; itemControl.append(option);
+        }
+        itemControl.value = [...itemControl.options].some(option => option.value === current) ? current : '';
+        action.required = Boolean(itemControl.value);
+      }
+      choices();
+      itemControl.value = record?.itemId ?? selectedItem?.id ?? '';
+      action.required = Boolean(itemControl.value);
+      itemControl.addEventListener('change', () => {
+        const item = listItems(snapshot.collection, vehicleControl.value).find(item => item.id === itemControl.value);
+        action.required = Boolean(item);
+        if (!record) action.value = item ? itemAction(kind, item) : '';
+      });
+      vehicleControl.addEventListener('change', choices);
+    }
     const date = historyDateField(row, 'date', kind === 'gap' ? 'Start date' : 'Date', record?.date ?? '');
     if (kind === 'gap') {
       historyDateField(row, 'endDate', 'End date', record?.endDate ?? '');
@@ -361,6 +556,11 @@ export async function start(document, storage) {
       historyField(row, 'fuelUnit', 'Fuel units', record?.fuelUnit ?? vehicle.fuelUnit, { choices: Object.entries(fuelUnitLabels) });
       historyField(row, 'fuelAmount', 'Fuel added (optional)', record?.fuelAmount ?? null);
       historyField(row, 'tankStatus', 'Tank after fueling', record?.tankStatus ?? 'unknown', { choices: [['unknown', 'Unknown'], ['full', 'Full'], ['partial', 'Partial']] });
+    }
+    if (['maintenance', 'observation'].includes(kind)) {
+      historyField(row, 'partUsed', 'Part used (optional)', record?.partUsed ?? '', { maxLength: 500 });
+      historyField(row, 'costAmount', 'Cost amount (optional)', record?.cost?.amount ?? '', { numeric: true });
+      historyField(row, 'currency', 'Currency (three letters, required with cost)', record?.cost?.currency ?? '', { maxLength: 3 });
     }
     historyField(row, 'notes', 'Notes (optional)', record?.notes ?? '', { multiline: true });
     if (!historyEditing) row.append(button('Discard draft record', () => {
@@ -425,6 +625,12 @@ export async function start(document, storage) {
       if (invalid) { historyError(invalid, invalid.validationMessage); return; }
       const details = Object.fromEntries(controls.map(control => [control.dataset.field, control.value]));
       for (const key of ['odometer', 'fuelAmount']) if (key in details) details[key] = details[key] === '' ? null : Number(details[key]);
+      if ('itemId' in details) {
+        details.itemId ||= null;
+        details.cost = details.costAmount === '' ? null : { amount: Number(details.costAmount), currency: details.currency.toUpperCase() };
+        delete details.costAmount;
+        delete details.currency;
+      }
       try {
         if (row.dataset.recordId) {
           collection = updateRecord(collection, row.dataset.recordId, details);
@@ -446,9 +652,9 @@ export async function start(document, storage) {
     else byId('submit-history').textContent = 'Retry saving history';
   });
 
-  byId('record-history').addEventListener('click', () => openHistoryEditor());
+  byId('record-history').addEventListener('click', () => { historyItemId = null; openHistoryEditor(); });
   byId('history-add').addEventListener('click', () => openHistoryEditor());
-  byId('view-history').addEventListener('click', () => { if (!busy) showHistory(); });
+  byId('view-history').addEventListener('click', () => { if (!busy) showHistory(null); });
   byId('history-summary').addEventListener('click', () => { if (!busy) render(); });
   for (const kind of ['fueling', 'oil-change', 'tire-change', 'maintenance', 'observation', 'odometer']) byId(`add-${kind}`).addEventListener('click', () => addDraft(kind));
   byId('history-gap').addEventListener('click', () => {

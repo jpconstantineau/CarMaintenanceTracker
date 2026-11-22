@@ -109,8 +109,14 @@ input[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--
 #history-list p { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .record-notes { white-space: pre-wrap; }
 .review-note { border-inline-start: 4px solid var(--secondary); padding-inline-start: var(--space-control); }
-#history-error { color: var(--error); background: var(--error-surface); padding: var(--space-control); border-radius: var(--corner); overflow-wrap: anywhere; }
-#history-error:empty { display: none; }
+#history-error, #item-error { color: var(--error); background: var(--error-surface); padding: var(--space-control); border-radius: var(--corner); overflow-wrap: anywhere; }
+#history-error:empty, #item-error:empty { display: none; }
+.maintenance-section { margin-block-start: var(--space-xl); }
+#maintenance-list { list-style: none; padding: 0; }
+#maintenance-list > li { margin-block-end: var(--space-md); }
+#maintenance-list p, #item-details { overflow-wrap: anywhere; }
+#item-summary { margin-block-end: var(--space-lg); }
+#item-details a { color: var(--primary); display: inline-block; min-block-size: var(--target); }
 select[aria-invalid="true"] { border-color: var(--error); }
 dt { font-weight: 600; }
 dd { margin: 0 0 var(--space-md); overflow-wrap: anywhere; white-space: pre-wrap; font-variant-numeric: tabular-nums; }

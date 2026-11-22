@@ -1,0 +1,119 @@
+import { test, expect } from '@playwright/test';
+
+async function openVehicle(page) {
+  await page.goto('./');
+  await page.getByRole('button', { name: 'Add vehicle', exact: true }).click();
+  await page.getByLabel('Vehicle name (required)').fill('Maintenance car');
+  await page.getByLabel('Kilometres (km)', { exact: true }).check();
+  await page.getByRole('button', { name: 'Create vehicle', exact: true }).click();
+  await expect(page.locator('#save-status')).toHaveText('Saved on this device.');
+}
+
+test('create an item, record service and inspection, correct history and reopen due details @live', async ({ page }, testInfo) => {
+  await openVehicle(page);
+  await page.getByRole('button', { name: 'Add maintenance item', exact: true }).click();
+  await page.getByLabel('Common item').selectOption('Cabin air filter');
+  await page.getByLabel('Compatible part numbers (optional)').fill('CF-123');
+  await page.getByLabel('Reference links (one http/https URL per line, optional)').fill('https://example.com/filter');
+  await page.getByLabel('Tracking method').selectOption('interval');
+  await page.getByLabel('Distance interval (optional)').fill('10000');
+  await page.getByLabel('Time interval (months, optional)').fill('12');
+  await page.getByRole('button', { name: 'Save item', exact: true }).click();
+  await expect(page.locator('#item-details')).toContainText('Last completed service is unknown');
+  await page.getByRole('button', { name: 'Replace Cabin air filter', exact: true }).click();
+  await expect(page.getByLabel('Date (required)', { exact: true })).toHaveValue('');
+  await expect(page.getByLabel('Odometer (optional)', { exact: true })).toHaveValue('');
+  await page.getByLabel('Date (required)', { exact: true }).fill('2024-01-31');
+  await page.getByLabel('Odometer (optional)', { exact: true }).fill('100000');
+  await page.getByLabel('Part used (optional)').fill('CF-123');
+  await page.getByLabel('Cost amount (optional)').fill('25');
+  await page.getByLabel('Currency (three letters, required with cost)').fill('CAD');
+  await page.getByRole('button', { name: 'Save records', exact: true }).click();
+  await expect(page.locator('#history-list')).toContainText('25 CAD');
+  await page.getByRole('button', { name: 'Vehicle summary', exact: true }).click();
+  await expect(page.locator('#maintenance-list')).toContainText('110,000 km');
+  await page.getByRole('button', { name: 'Cabin air filter — details', exact: true }).click();
+  await page.getByRole('button', { name: 'Inspect Cabin air filter', exact: true }).click();
+  await expect(page.getByLabel('Date (required)', { exact: true })).toHaveValue('');
+  await page.getByLabel('Date (required)', { exact: true }).fill('2025-02-01');
+  await page.getByLabel('Odometer (optional)', { exact: true }).fill('108000');
+  await page.getByRole('button', { name: 'Save records', exact: true }).click();
+  await page.getByRole('button', { name: 'Vehicle summary', exact: true }).click();
+  await page.getByRole('button', { name: 'Cabin air filter — details', exact: true }).click();
+  await expect(page.locator('#item-details')).toContainText('2025-01-31');
+  await page.getByRole('button', { name: 'View item history', exact: true }).click();
+  await expect(page.locator('#history-list > li')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Edit record 2', exact: true }).click();
+  await page.getByLabel('Odometer (optional)', { exact: true }).fill('101000');
+  await page.getByRole('button', { name: 'Save record', exact: true }).click();
+  await expect(page.locator('#save-status')).toHaveText('Saved on this device.');
+  await page.reload();
+  await expect(page.locator('#maintenance-list')).toContainText('111,000 km');
+  await page.getByRole('button', { name: 'Cabin air filter — details', exact: true }).click();
+  await expect(page.locator('#item-details')).toContainText('CF-123');
+  await page.screenshot({ path: testInfo.outputPath('maintenance-detail.png'), fullPage: true });
+});
+
+test('custom item validation, literal text and history-only settings work with keyboard and narrow layouts @live', async ({ page }, testInfo) => {
+  await openVehicle(page);
+  await page.setViewportSize({ width: 320, height: 900 });
+  await page.getByRole('button', { name: 'Add maintenance item', exact: true }).click();
+  await page.getByRole('button', { name: 'Save item', exact: true }).click();
+  await expect(page.getByLabel('Item name (required)')).toBeFocused();
+  await expect(page.getByLabel('Item name (required)')).toHaveAttribute('aria-invalid', 'true');
+  await page.getByLabel('Item name (required)').fill('<img src=x onerror=alert(1)> Custom item');
+  await page.getByLabel('Reference links (one http/https URL per line, optional)').fill('javascript:alert(1)');
+  await page.getByRole('button', { name: 'Save item', exact: true }).click();
+  await expect(page.getByLabel('Reference links (one http/https URL per line, optional)')).toBeFocused();
+  await page.getByLabel('Reference links (one http/https URL per line, optional)').fill('https://example.com/' + 'long'.repeat(80));
+  await page.locator('#item-form').getByLabel('Notes (optional)').fill('Long note '.repeat(100));
+  await page.getByLabel('Theme', { exact: true }).selectOption('dark');
+  await page.getByRole('button', { name: 'Save item', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#item-title')).toBeFocused();
+  await expect(page.locator('#item-title')).toHaveText('<img src=x onerror=alert(1)> Custom item');
+  await expect(page.locator('#item-view img')).toHaveCount(0);
+  await expect(page.locator('#item-details')).toContainText('History only');
+  await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('maintenance-dark-narrow.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Edit item', exact: true }).click();
+  await page.getByLabel('Tracking method').selectOption('condition');
+  await page.getByLabel('Condition being measured (required)').fill('Oil life');
+  await page.getByLabel('Condition units (required)').fill('%');
+  await page.getByLabel('Condition threshold (required)').fill('0');
+  await page.getByRole('button', { name: 'Save item', exact: true }).click();
+  await expect(page.locator('#item-details')).toContainText('at or below 0 %');
+  await expect(page.locator('#item-details')).toContainText('Due status unavailable');
+  await page.getByRole('button', { name: 'Vehicle summary', exact: true }).click();
+  await page.getByRole('button', { name: 'All vehicles', exact: true }).click();
+  await page.getByRole('button', { name: 'Add vehicle', exact: true }).click();
+  await page.getByLabel('Vehicle name (required)').fill('Second car');
+  await page.getByLabel('Miles (mi)', { exact: true }).check();
+  await page.getByRole('button', { name: 'Create vehicle', exact: true }).click();
+  await expect(page.locator('#maintenance-list > li')).toHaveCount(0);
+});
+
+test('an interrupted item transaction preserves editable settings and retry does not duplicate the item', async ({ page }) => {
+  await openVehicle(page);
+  await page.getByRole('button', { name: 'Add maintenance item', exact: true }).click();
+  await page.getByLabel('Common item').selectOption('Brakes');
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (...args) {
+      IDBObjectStore.prototype.put = put;
+      const request = put.apply(this, args);
+      request.addEventListener('success', () => this.transaction.abort());
+      return request;
+    };
+  });
+  await page.getByRole('button', { name: 'Save item', exact: true }).click();
+  await expect(page.locator('#save-status')).toHaveText('Not saved on this device.');
+  await expect(page.getByLabel('Item name (required)')).toHaveValue('Brakes');
+  await page.getByLabel('Item name (required)').fill('Front brakes');
+  await page.getByRole('button', { name: 'Retry saving item', exact: true }).click();
+  await expect(page.locator('#save-status')).toHaveText('Saved on this device.');
+  await page.reload();
+  await expect(page.locator('#maintenance-list > li')).toHaveCount(1);
+  await expect(page.locator('#maintenance-list')).toContainText('Front brakes');
+});

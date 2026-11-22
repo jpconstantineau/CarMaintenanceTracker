@@ -233,7 +233,7 @@ test('a prior v1 collection reopens and edits without replacing IDs, notes or de
   }, fixture);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Older Civic' })).toBeVisible();
-  expect((await loadSnapshot(page)).collection).toEqual({ ...fixture, schemaVersion: 3, vehicles: fixture.vehicles.map(vehicle => ({ ...vehicle, fuelUnit: 'L' })) });
+  expect((await loadSnapshot(page)).collection).toEqual({ ...fixture, schemaVersion: 4, items: [], vehicles: fixture.vehicles.map(vehicle => ({ ...vehicle, fuelUnit: 'L' })) });
   await page.getByRole('button', { name: 'All vehicles' }).click();
   await createVehicle(page, 'Another vehicle');
   const result = (await loadSnapshot(page)).collection;

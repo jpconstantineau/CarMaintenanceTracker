@@ -1,5 +1,5 @@
 export const FORMAT = 'car-maintenance-tracker';
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 export const FUEL_UNITS = ['L', 'US gal', 'Imp gal'];
 
 export class ValidationError extends Error {
@@ -62,8 +62,13 @@ export function dateBounds(value, field = 'date') {
   };
 }
 
-function validateEvent(record) {
-  shape(record, record.kind === 'fueling' ? [...eventKeys, 'fuelAmount', 'fuelUnit', 'tankStatus'] : eventKeys, 'Vehicle activity');
+const itemEventKinds = ['maintenance', 'observation'];
+const itemEventDefaults = { itemId: null, action: '', partUsed: '', cost: null };
+
+function validateEvent(record, collection, version = SCHEMA_VERSION) {
+  const extra = record.kind === 'fueling' ? ['fuelAmount', 'fuelUnit', 'tankStatus'] :
+    version >= 4 && itemEventKinds.includes(record.kind) ? Object.keys(itemEventDefaults) : [];
+  shape(record, [...eventKeys, ...extra], 'Vehicle activity');
   dateBounds(record.date);
   requireValue(record.odometer === null || (typeof record.odometer === 'number' && Number.isFinite(record.odometer) && record.odometer >= 0 && record.odometer <= Number.MAX_SAFE_INTEGER), 'Enter a nonnegative odometer reading, or leave it blank.', 'odometer');
   requireValue(['km', 'mi'].includes(record.odometerUnit), 'Choose kilometres or miles.', 'odometerUnit');
@@ -71,6 +76,16 @@ function validateEvent(record) {
   requireValue(record.kind !== 'odometer' || record.odometer !== null, 'An odometer-only record needs a reading. Choose a car activity to keep other partial history.', 'odometer');
   timestamp(record.createdAt);
   timestamp(record.updatedAt);
+  if (version >= 4 && itemEventKinds.includes(record.kind)) {
+    requireValue(record.itemId === null || collection.items.some(item => item.id === record.itemId && item.vehicleId === record.vehicleId), 'Choose an item belonging to this vehicle.', 'itemId');
+    text(record.action, 'action', 100, record.itemId !== null);
+    text(record.partUsed, 'partUsed', 500);
+    if (record.cost !== null) {
+      shape(record.cost, ['amount', 'currency'], 'Cost');
+      requireValue(Number.isFinite(record.cost.amount) && record.cost.amount >= 0, 'Enter a nonnegative cost or leave it blank.', 'costAmount');
+      requireValue(typeof record.cost.currency === 'string' && /^[A-Z]{3}$/.test(record.cost.currency), 'Enter a three-letter currency, such as CAD.', 'currency');
+    }
+  }
   if (record.kind === 'fueling') {
     requireValue(record.fuelAmount === null || (typeof record.fuelAmount === 'number' && Number.isFinite(record.fuelAmount) && record.fuelAmount > 0), 'Enter a positive fuel quantity, or leave it blank.', 'fuelAmount');
     requireValue(FUEL_UNITS.includes(record.fuelUnit), 'Choose litres, US gallons, or Imperial gallons.', 'fuelUnit');
@@ -79,6 +94,59 @@ function validateEvent(record) {
 }
 
 export const HISTORY_TYPES = ['all', 'odometer', 'observation', 'maintenance', 'oil', 'tires', 'fueling'];
+
+export const COMMON_ITEMS = ['Engine air filter', 'Cabin air filter', 'Oil filter', 'Fuel filter', 'Engine coolant', 'Brake fluid', 'Transmission fluid', 'Brakes', 'Spark plugs', 'Belts', 'Wipers', 'Battery', 'Bulbs'];
+const itemDetailKeys = ['name', 'specifications', 'compatibleParts', 'preferredBrand', 'notes', 'links', 'tracking'];
+
+function validateItem(item) {
+  shape(item, ['id', 'vehicleId', ...itemDetailKeys, 'createdAt', 'updatedAt'], 'Maintenance item');
+  text(item.name, 'name', 100, true);
+  for (const key of ['specifications', 'compatibleParts', 'notes']) text(item[key], key, 5000);
+  text(item.preferredBrand, 'preferredBrand', 100);
+  requireValue(Array.isArray(item.links) && item.links.length <= 20, 'Enter at most 20 reference links.', 'links');
+  for (const link of item.links) {
+    let url;
+    try { url = new URL(link); } catch { /* Report the field below. */ }
+    requireValue(typeof link === 'string' && link.length <= 2000 && url && ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password,
+      'Use complete http or https reference links without credentials.', 'links');
+  }
+  const tracking = item.tracking;
+  shape(tracking, ['distance', 'months', 'condition'], 'Tracking settings');
+  if (tracking.distance !== null) {
+    shape(tracking.distance, ['value', 'unit'], 'Distance interval');
+    requireValue(Number.isFinite(tracking.distance.value) && tracking.distance.value > 0 && tracking.distance.value <= Number.MAX_SAFE_INTEGER, 'Enter a positive distance interval.', 'distance');
+    requireValue(['km', 'mi'].includes(tracking.distance.unit), 'Choose interval kilometres or miles.', 'distanceUnit');
+  }
+  requireValue(tracking.months === null || (Number.isInteger(tracking.months) && tracking.months > 0 && tracking.months <= 1200), 'Enter a whole number of months from 1 to 1200.', 'months');
+  if (tracking.condition !== null) {
+    shape(tracking.condition, ['metric', 'unit', 'operator', 'threshold'], 'Condition setting');
+    text(tracking.condition.metric, 'metric', 100, true);
+    text(tracking.condition.unit, 'conditionUnit', 100, true);
+    requireValue(['at-or-below', 'at-or-above'].includes(tracking.condition.operator), 'Choose a condition comparison.', 'operator');
+    requireValue(Number.isFinite(tracking.condition.threshold) && tracking.condition.threshold >= 0, 'Enter a nonnegative condition threshold.', 'threshold');
+  }
+  timestamp(item.createdAt);
+  timestamp(item.updatedAt);
+}
+
+export function listItems(collection, vehicleId) {
+  getVehicle(collection, vehicleId);
+  return structuredClone(collection.items.filter(item => item.vehicleId === vehicleId));
+}
+
+export function saveItem(collection, vehicleId, details, itemId = null) {
+  getVehicle(collection, vehicleId);
+  const previous = collection.items.find(item => item.id === itemId && item.vehicleId === vehicleId);
+  requireValue(itemId === null || previous, 'Select an existing item on this vehicle.');
+  const values = { specifications: '', compatibleParts: '', preferredBrand: '', notes: '', links: [], tracking: { distance: null, months: null, condition: null }, ...details };
+  shape(values, itemDetailKeys, 'Item details');
+  const now = new Date().toISOString();
+  const item = { ...values, id: previous?.id ?? crypto.randomUUID(), vehicleId, createdAt: previous?.createdAt ?? now, updatedAt: now };
+  const next = structuredClone(collection);
+  if (previous) next.items[next.items.findIndex(value => value.id === itemId)] = structuredClone(item);
+  else next.items.push(structuredClone(item));
+  return { collection: validateCollection(next), itemId: item.id };
+}
 
 function validateGap(record) {
   shape(record, ['id', 'vehicleId', 'kind', 'date', 'endDate', 'historyType', 'notes', 'createdAt', 'updatedAt'], 'Known gap');
@@ -102,7 +170,7 @@ export function validateCollection(collection) {
 }
 
 function validateVersion(collection, version) {
-  shape(collection, ['format', 'schemaVersion', 'id', 'vehicles', 'records', 'tombstones'], 'Collection');
+  shape(collection, ['format', 'schemaVersion', 'id', 'vehicles', 'records', 'tombstones', ...(version >= 4 ? ['items'] : [])], 'Collection');
   requireValue(collection.format === FORMAT, 'This is not a Car Maintenance Tracker collection.');
   requireValue(collection.schemaVersion === version, 'This collection version is not supported. Use a compatible app; your stored data has not been changed.');
   id(collection.id);
@@ -120,6 +188,14 @@ function validateVersion(collection, version) {
     timestamp(vehicle.createdAt);
     timestamp(vehicle.updatedAt);
   }
+  if (version >= 4) {
+    requireValue(Array.isArray(collection.items), 'Items must be a list.');
+    for (const item of collection.items) {
+      unique(item.id);
+      requireValue(collection.vehicles.some(vehicle => vehicle.id === item.vehicleId), 'Item refers to a missing vehicle.');
+      validateItem(item);
+    }
+  }
   for (const record of collection.records) {
     requireValue(version !== 1, 'Version one does not support factual records.');
     requireValue(version !== 2 || versionTwoKinds.includes(record?.kind), 'This record kind is not supported in version two.');
@@ -128,30 +204,32 @@ function validateVersion(collection, version) {
     requireValue(collection.vehicles.some(vehicle => vehicle.id === record.vehicleId), 'Record refers to a missing vehicle.');
     const validate = recordValidators.get(record.kind);
     requireValue(Boolean(validate), 'This record kind is not supported. Your stored data has not been changed.');
-    validate(record, collection);
+    validate(record, collection, version);
   }
   for (const marker of collection.tombstones) {
     shape(marker, ['id', 'kind', 'deletedAt'], 'Deletion marker');
     unique(marker.id, version >= 3 && marker.kind === 'vehicle');
-    requireValue(marker.kind === 'vehicle' || (version !== 1 && recordValidators.has(marker.kind) && (version !== 2 || versionTwoKinds.includes(marker.kind))), 'Unsupported deletion kind.');
+    requireValue(marker.kind === 'vehicle' || (version >= 4 && marker.kind === 'item') || (version !== 1 && recordValidators.has(marker.kind) && (version !== 2 || versionTwoKinds.includes(marker.kind))), 'Unsupported deletion kind.');
     timestamp(marker.deletedAt);
   }
   return collection;
 }
 
 export function migrateCollection(collection) {
-  if ([1, 2].includes(collection?.schemaVersion)) {
+  if ([1, 2, 3].includes(collection?.schemaVersion)) {
     validateVersion(collection, collection.schemaVersion);
     const migrated = structuredClone(collection);
     migrated.schemaVersion = SCHEMA_VERSION;
-    migrated.vehicles = migrated.vehicles.map(vehicle => ({ ...vehicle, fuelUnit: 'L' }));
+    migrated.vehicles = migrated.vehicles.map(vehicle => ({ fuelUnit: 'L', ...vehicle }));
+    migrated.items = [];
+    migrated.records = migrated.records.map(record => itemEventKinds.includes(record.kind) ? { ...itemEventDefaults, ...record } : record);
     return validateCollection(migrated);
   }
   return validateCollection(collection);
 }
 
 export function createCollection() {
-  return { format: FORMAT, schemaVersion: SCHEMA_VERSION, id: crypto.randomUUID(), vehicles: [], records: [], tombstones: [] };
+  return { format: FORMAT, schemaVersion: SCHEMA_VERSION, id: crypto.randomUUID(), vehicles: [], items: [], records: [], tombstones: [] };
 }
 
 export function getVehicle(collection, vehicleId) {
@@ -197,6 +275,8 @@ export function removeVehicle(collection, vehicleId) {
     next.tombstones.push({ id: record.id, kind: record.kind, deletedAt });
   }
   next.records = next.records.filter(record => record.vehicleId !== vehicleId);
+  for (const item of next.items.filter(item => item.vehicleId === vehicleId)) next.tombstones.push({ id: item.id, kind: 'item', deletedAt });
+  next.items = next.items.filter(item => item.vehicleId !== vehicleId);
   next.vehicles = next.vehicles.filter(vehicle => vehicle.id !== vehicleId);
   next.tombstones.push({ id: vehicleId, kind: 'vehicle', deletedAt });
   return validateCollection(next);
@@ -215,12 +295,12 @@ export function saveSession(collection, defaults, entries) {
   const recordIds = [];
   for (const [index, entry] of entries.entries()) {
     const shared = entry.kind === 'gap' ? { vehicleId: defaults.vehicleId, date: defaults.date } : { odometer: null, ...defaults };
-    const record = { notes: '', ...shared, ...entry, id: crypto.randomUUID(), createdAt: now, updatedAt: now };
+    const record = { notes: '', ...(itemEventKinds.includes(entry.kind) ? itemEventDefaults : {}), ...shared, ...entry, id: crypto.randomUUID(), createdAt: now, updatedAt: now };
     try {
       getVehicle(collection, record.vehicleId);
       const validate = recordValidators.get(record.kind);
       requireValue(Boolean(validate), 'Choose a supported record kind.', 'kind');
-      validate(record);
+      validate(record, collection);
     } catch (error) { error.entryIndex = index; throw error; }
     next.records.push(record);
     recordIds.push(record.id);
