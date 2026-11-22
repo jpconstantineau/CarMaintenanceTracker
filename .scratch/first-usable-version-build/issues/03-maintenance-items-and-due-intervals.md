@@ -4,7 +4,7 @@
 
 **Blocked by:** [Record and correct dated vehicle history](02-record-and-correct-history.md)
 
-**Status:** ready-for-agent
+**Status:** implemented; review and release verification in progress
 
 **Source specification:** [CarMaintenanceTracker: first usable version](../../first-usable-version/spec.md). Relevant sections: Implementation Decisions 3–6; maintenance and interval acceptance cases.
 

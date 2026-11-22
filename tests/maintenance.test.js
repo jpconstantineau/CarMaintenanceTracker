@@ -27,6 +27,54 @@ test('vehicle-specific items retain editable replacement information without req
   assert.throws(() => History.saveItem(saved.collection, first.vehicleId, { name: 'Unsafe', links: ['javascript:alert(1)'] }));
 });
 
+test('a full-length item name can be retained in the concrete service action', () => {
+  const car = vehicle();
+  const item = History.saveItem(car.collection, car.vehicleId, { name: 'A'.repeat(100) });
+  const saved = History.saveSession(item.collection, { vehicleId: car.vehicleId, odometerUnit: 'km' }, [
+    { kind: 'maintenance', itemId: item.itemId, action: 'Replace ' + 'A'.repeat(100), date: '2024' },
+  ]);
+  assert.equal(History.getRecord(saved.collection, saved.recordIds[0]).action, 'Replace ' + 'A'.repeat(100));
+});
+
+test('removing an item and its linked history retains deletion identities and other items', () => {
+  const car = vehicle();
+  const first = History.saveItem(car.collection, car.vehicleId, { name: 'Filter' });
+  const second = History.saveItem(first.collection, car.vehicleId, { name: 'Brakes' });
+  const saved = History.saveSession(second.collection, { vehicleId: car.vehicleId, odometerUnit: 'km', date: '2024' }, [
+    { kind: 'maintenance', itemId: first.itemId, action: 'Replace' },
+    { kind: 'observation', itemId: second.itemId, action: 'Inspect' },
+    { kind: 'maintenance', notes: 'Unassigned work' },
+  ]);
+  const removed = History.removeItem(saved.collection, first.itemId);
+  assert.deepEqual(History.listItems(removed, car.vehicleId).map(item => item.id), [second.itemId]);
+  assert.deepEqual(History.listRecords(removed, car.vehicleId).map(record => record.id), saved.recordIds.slice(1));
+  assert.deepEqual(removed.tombstones.map(marker => marker.id).sort(), [first.itemId, saved.recordIds[0]].sort());
+  assert.deepEqual(deserialize(serialize(removed)), removed);
+  assert.equal(saved.collection.items.length, 2);
+});
+
+test('equivalent mixed-unit readings and contradictory evidence cannot order overlapping services', () => {
+  const car = vehicle();
+  const item = History.saveItem(car.collection, car.vehicleId, { name: 'Filter', tracking: { distance: null, months: 6, condition: null } });
+  const equivalent = History.saveSession(item.collection, { vehicleId: car.vehicleId, itemId: item.itemId, action: 'Replace' }, [
+    { kind: 'maintenance', date: '2024', odometer: 9, odometerUnit: 'mi' },
+    { kind: 'maintenance', date: '2024-06', odometer: 14.484096, odometerUnit: 'km' },
+  ]);
+  const equalResult = Calculations.maintenanceSummary(equivalent.collection, car.vehicleId, '2025-01-01')[0];
+  assert.equal(equalResult.serviceId, null);
+  assert.equal(equalResult.dueDate, null);
+  const conflicting = History.saveSession(item.collection, { vehicleId: car.vehicleId, odometerUnit: 'km' }, [
+    { kind: 'maintenance', itemId: item.itemId, action: 'Replace', date: '2024', odometer: 10000 },
+    { kind: 'maintenance', itemId: item.itemId, action: 'Replace', date: '2024-06', odometer: 20000 },
+    { kind: 'odometer', date: '2024-07-01', odometer: 5000 },
+  ]);
+  const conflictResult = Calculations.maintenanceSummary(conflicting.collection, car.vehicleId, '2025-01-01')[0];
+  assert.equal(conflictResult.serviceId, null);
+  assert.equal(conflictResult.dueDate, null);
+  const orderedByDates = History.updateRecord(conflicting.collection, conflicting.recordIds[0], { date: '2023' });
+  assert.equal(Calculations.maintenanceSummary(orderedByDates, car.vehicleId, '2025-01-01')[0].status, 'due');
+});
+
 test('evaluation dates do not consume future mileage or declare the future service due', () => {
   const car = vehicle();
   const item = History.saveItem(car.collection, car.vehicleId, { name: 'Filter', tracking: { distance: { value: 10000, unit: 'km' }, months: null, condition: null } });

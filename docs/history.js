@@ -78,7 +78,7 @@ function validateEvent(record, collection, version = SCHEMA_VERSION) {
   timestamp(record.updatedAt);
   if (version >= 4 && itemEventKinds.includes(record.kind)) {
     requireValue(record.itemId === null || collection.items.some(item => item.id === record.itemId && item.vehicleId === record.vehicleId), 'Choose an item belonging to this vehicle.', 'itemId');
-    text(record.action, 'action', 100, record.itemId !== null);
+    text(record.action, 'action', 200, record.itemId !== null);
     text(record.partUsed, 'partUsed', 500);
     if (record.cost !== null) {
       shape(record.cost, ['amount', 'currency'], 'Cost');
@@ -146,6 +146,20 @@ export function saveItem(collection, vehicleId, details, itemId = null) {
   if (previous) next.items[next.items.findIndex(value => value.id === itemId)] = structuredClone(item);
   else next.items.push(structuredClone(item));
   return { collection: validateCollection(next), itemId: item.id };
+}
+
+export function removeItem(collection, itemId) {
+  validateCollection(collection);
+  requireValue(collection.items.some(item => item.id === itemId), 'Select an existing maintenance item.');
+  const next = structuredClone(collection);
+  const deletedAt = new Date().toISOString();
+  for (const record of next.records.filter(record => record.itemId === itemId)) {
+    next.tombstones.push({ id: record.id, kind: record.kind, deletedAt });
+  }
+  next.records = next.records.filter(record => record.itemId !== itemId);
+  next.items = next.items.filter(item => item.id !== itemId);
+  next.tombstones.push({ id: itemId, kind: 'item', deletedAt });
+  return validateCollection(next);
 }
 
 function validateGap(record) {

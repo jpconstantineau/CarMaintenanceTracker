@@ -52,6 +52,21 @@ test('create an item, record service and inspection, correct history and reopen 
   await page.getByRole('button', { name: 'Cabin air filter — details', exact: true }).click();
   await expect(page.locator('#item-details')).toContainText('CF-123');
   await page.screenshot({ path: testInfo.outputPath('maintenance-detail.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Edit item', exact: true }).click();
+  page.once('dialog', async dialog => {
+    expect(dialog.message()).toContain('Cabin air filter');
+    expect(dialog.message()).toContain('2 linked history records');
+    await dialog.dismiss();
+  });
+  await page.getByRole('button', { name: 'Delete item', exact: true }).click();
+  await expect(page.getByLabel('Item name (required)')).toHaveValue('Cabin air filter');
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Delete item', exact: true }).click();
+  await expect(page.locator('#save-status')).toHaveText('Saved on this device.');
+  await page.reload();
+  await expect(page.locator('#maintenance-list > li')).toHaveCount(0);
+  await page.getByRole('button', { name: 'View history', exact: true }).click();
+  await expect(page.locator('#history-list > li')).toHaveCount(0);
 });
 
 test('custom item validation, literal text and history-only settings work with keyboard and narrow layouts @live', async ({ page }, testInfo) => {

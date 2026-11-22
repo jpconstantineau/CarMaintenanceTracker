@@ -14,8 +14,10 @@ A vanilla HTML/CSS/JavaScript app for personal vehicle maintenance history, host
 - Enter each record's date and mileage independently, using native date pickers and numeric odometer inputs. Approximate month/year dates remain available.
 - Backfill, correct, or remove individual records, review mileage conflicts, and mark missing records separately in history.
 - Inspect dated mileage evidence and reopen factual history, including collections saved by the first release.
+- Configure common or custom maintenance items, parts, specifications, brands and reference links per vehicle.
+- Record linked services and inspections with optional parts/cost, and review distance/time due intervals with supporting item history. History-only tracking needs no schedule; condition settings are retained for later specialized measurements.
 
-Vehicle details and history are stored in this browser on this device. Maintenance schedules, detailed oil/tire tracking, fuel economy, forecasts, JSON transfer and GitHub Gist sync are future tickets. The intended cloud storage remains the user's own GitHub Gist; authentication will use a small Cloudflare Worker.
+Vehicle details and history are stored in this browser on this device. Detailed oil/tire tracking and condition forecasts, fuel economy, JSON transfer and GitHub Gist sync are future tickets. The intended cloud storage remains the user's own GitHub Gist; authentication will use a small Cloudflare Worker.
 
 ## Run and test
 
@@ -44,6 +46,7 @@ On Linux, install browsers with `npx playwright install --with-deps chromium web
 - [Local module, persistence and release contracts](documentation/vehicle-foundation.md)
 - [UI purpose and verification ledger](documentation/vehicle-ui-ledger.md)
 - [History contracts and UI verification ledger](documentation/history.md)
+- [Maintenance contracts and UI verification ledger](documentation/maintenance.md)
 - [Implementation tickets](.scratch/first-usable-version-build/issues/01-create-and-reopen-vehicles.md)
 
 GitHub Pages publishes `main` → `/docs`. Run the checks before integrating/pushing a ticket, then verify the deployed commit and assets with `node scripts/verify-pages.mjs <full-commit-SHA>` and run the browser journeys against the live site. The release contract documents this workflow. During early development the owner permits schema-version resets instead of migrations; disclose any reset in release notes. The current release retains earlier data.

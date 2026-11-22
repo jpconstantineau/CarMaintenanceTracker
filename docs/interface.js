@@ -1,5 +1,5 @@
-import { createCollection, getVehicle, saveVehicle, removeVehicle, getRecord, saveSession, updateRecord, removeRecord, listItems, saveItem, COMMON_ITEMS, HISTORY_TYPES } from './history.js?v=91ac1525558b';
-import { summarizeVehicle, vehicleHistory, maintenanceSummary } from './calculations.js?v=91ac1525558b';
+import { createCollection, getVehicle, saveVehicle, removeVehicle, getRecord, saveSession, updateRecord, removeRecord, listItems, saveItem, removeItem, COMMON_ITEMS, HISTORY_TYPES } from './history.js?v=313a75df76a0';
+import { summarizeVehicle, vehicleHistory, maintenanceSummary } from './calculations.js?v=313a75df76a0';
 
 const dateLabel = date => `${date}${date.length === 4 ? ' (year known)' : date.length === 7 ? ' (month known)' : ''}`;
 const mileageLabel = (value, unit) => value === null ? 'Mileage unknown' : `${new Intl.NumberFormat('en', { maximumFractionDigits: 3 }).format(value)} ${unit}`;
@@ -327,6 +327,7 @@ export async function start(document, storage) {
     byId('item-vehicle').textContent = vehicle.name;
     byId('item-error').textContent = '';
     byId('submit-item').textContent = 'Save item';
+    byId('delete-item').hidden = !item;
     const controls = byId('item-controls');
     controls.replaceChildren();
     const common = historyField(controls, 'common', 'Common item', '', { choices: [['', 'Custom item'], ...COMMON_ITEMS.map(name => [name, name])] });
@@ -400,6 +401,19 @@ export async function start(document, storage) {
     }
   });
   byId('add-item').addEventListener('click', () => editItem());
+  byId('delete-item').addEventListener('click', async () => {
+    if (busy || !editingItemId) return;
+    const item = listItems(snapshot.collection, snapshot.selectedVehicleId).find(item => item.id === editingItemId);
+    const count = snapshot.collection.records.filter(record => record.itemId === item.id).length;
+    if (!view.confirm(`Delete “${item.name}” and its ${count} linked history records? This cannot be undone in the app.`)) return;
+    snapshot.collection = removeItem(snapshot.collection, item.id);
+    historyItemId = null;
+    editingItemId = null;
+    dirty = false;
+    await persist();
+    render();
+    if (pending) byId('retry').hidden = false;
+  });
   byId('item-summary').addEventListener('click', () => { if (!busy) render(); });
   byId('cancel-item').addEventListener('click', () => {
     if (busy) return;
@@ -524,7 +538,7 @@ export async function start(document, storage) {
     });
     if (['maintenance', 'observation'].includes(kind)) {
       const itemControl = historyField(row, 'itemId', 'Maintenance item (optional)', record?.itemId ?? selectedItem?.id ?? '', { choices: [] });
-      const action = historyField(row, 'action', 'Action performed', record?.action ?? (selectedItem ? itemAction(kind, selectedItem) : ''), { maxLength: 100 });
+      const action = historyField(row, 'action', 'Action performed (required with item)', record?.action ?? (selectedItem ? itemAction(kind, selectedItem) : ''), { maxLength: 200 });
       function choices() {
         const current = itemControl.value;
         itemControl.replaceChildren();

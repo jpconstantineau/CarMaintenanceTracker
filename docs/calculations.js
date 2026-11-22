@@ -1,4 +1,4 @@
-import { getVehicle, listRecords, listItems, dateBounds } from './history.js?v=91ac1525558b';
+import { getVehicle, listRecords, listItems, dateBounds } from './history.js?v=313a75df76a0';
 
 function distance(value, from, to) {
   if (from === to) return value;
@@ -34,25 +34,34 @@ export function mileageEvidence(collection, vehicleId) {
   return { points, gaps: records.filter(record => record.kind === 'gap' && ['all', 'odometer'].includes(record.historyType)), issues };
 }
 
+function chronologyComparator(evidence) {
+  const readings = new Map(evidence.points.map(point => [point.recordId, point.value]));
+  const conflictingIds = new Set(evidence.issues.filter(issue => issue.code !== 'ambiguous').flatMap(issue => issue.recordIds));
+  return (a, b) => {
+    const left = dateBounds(a.date), right = dateBounds(b.date);
+    if (left.end < right.start) return -1;
+    if (right.end < left.start) return 1;
+    if (a.kind === 'gap' || b.kind === 'gap' || !readings.has(a.id) || !readings.has(b.id) || conflictingIds.has(a.id) || conflictingIds.has(b.id)) return 0;
+    const difference = readings.get(a.id) - readings.get(b.id);
+    return Math.abs(difference) < 1e-8 ? 0 : Math.sign(difference);
+  };
+}
+
 export function vehicleHistory(collection, vehicleId) {
   const records = listRecords(collection, vehicleId);
   const evidence = mileageEvidence(collection, vehicleId);
   const issues = [...evidence.issues];
   const readings = new Map(evidence.points.map(point => [point.recordId, point.value]));
+  const compare = chronologyComparator(evidence);
   const newer = new Map(records.map(record => [record.id, new Set()]));
   for (let i = 0; i < records.length; i++) {
     for (const b of records.slice(i + 1)) {
       const a = records[i];
-      const left = dateBounds(a.date), right = dateBounds(b.date);
-      if (left.end < right.start) newer.get(a.id).add(b.id);
-      else if (right.end < left.start) newer.get(b.id).add(a.id);
+      const order = compare(a, b);
+      if (order < 0) newer.get(a.id).add(b.id);
+      else if (order > 0) newer.get(b.id).add(a.id);
       else if (a.kind !== 'gap' && b.kind !== 'gap') {
-        if (readings.has(a.id) && readings.has(b.id)) {
-          const difference = readings.get(a.id) - readings.get(b.id);
-          if (Math.abs(difference) >= 1e-8 && !evidence.issues.some(issue => issue.recordIds.includes(a.id) && issue.recordIds.includes(b.id))) {
-            newer.get(difference < 0 ? a.id : b.id).add(difference < 0 ? b.id : a.id);
-          }
-        } else if (a.date.length < 10 || b.date.length < 10) {
+        if ((!readings.has(a.id) || !readings.has(b.id)) && (a.date.length < 10 || b.date.length < 10)) {
           issues.push({ code: 'ambiguous', recordIds: [a.id, b.id], message: 'Approximate dates overlap without enough mileage evidence to establish order. Review dates if known.' });
         }
       }
@@ -106,6 +115,7 @@ export function maintenanceSummary(collection, vehicleId, asOf) {
   const history = vehicleHistory(collection, vehicleId);
   const mileage = summarizeVehicle(collection, vehicleId).odometer;
   const evidence = mileageEvidence(collection, vehicleId);
+  const compare = chronologyComparator(evidence);
   return listItems(collection, vehicleId).map(item => {
     const records = history.records.filter(record => record.itemId === item.id);
     const services = records.filter(record => record.kind === 'maintenance');
@@ -114,14 +124,7 @@ export function maintenanceSummary(collection, vehicleId, asOf) {
       status: 'unavailable', reasons: [], condition: tracking.condition };
     if (!tracking.distance && !tracking.months && !tracking.condition) return { ...result, status: 'history-only' };
     if (tracking.condition) result.reasons.push('Condition threshold configured; no condition measurement result is available.');
-    const later = (a, b) => {
-      if (dateBounds(a.date).start > dateBounds(b.date).end) return true;
-      if (dateBounds(a.date).end < dateBounds(b.date).start) return false;
-      return a.odometer !== null && b.odometer !== null &&
-        distance(a.odometer, a.odometerUnit, vehicle.odometerUnit) > distance(b.odometer, b.odometerUnit, vehicle.odometerUnit) &&
-        !evidence.issues.some(issue => issue.code !== 'ambiguous' && issue.recordIds.includes(a.id) && issue.recordIds.includes(b.id));
-    };
-    const candidates = services.filter(service => !services.some(other => other !== service && later(other, service)));
+    const candidates = services.filter(service => !services.some(other => other !== service && compare(other, service) > 0));
     if (candidates.length !== 1) {
       result.reasons.push(candidates.length ? 'Last completed service is ambiguous. Review item history.' : 'Last completed service is unknown.');
       return result;
