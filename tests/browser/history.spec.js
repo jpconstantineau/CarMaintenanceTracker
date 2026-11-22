@@ -221,7 +221,10 @@ test('failed history transaction retains editable drafts and retries without dup
   await page.getByRole('button', { name: 'Vehicle summary', exact: true }).click();
   await page.getByRole('button', { name: 'All vehicles', exact: true }).click();
   await page.getByRole('button', { name: 'Correction target', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Correction target', exact: true })).toBeVisible();
+  await expect(page.locator('#save-status')).toHaveText('Saved on this device.');
   await page.reload();
+  await expect(page.getByRole('heading', { name: 'Correction target', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'View history', exact: true }).click();
   await expect(page.locator('#history-list > li')).toHaveCount(1);
   await expect(page.locator('#history-list')).toContainText('Corrected after failure');
