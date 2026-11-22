@@ -18,3 +18,5 @@ description: Purpose-and-intent review for web UI design and frontend changes. R
 11. The ledger must record an evaluation, not manufacture a purpose for every existing choice.
 12. Rework decisions when the maintainer rejects their purpose or intent. Change the design and its evidence; persuasive wording alone does not resolve rejection.
 13. When designing a web page, explicitly state the user's task, the desired outcome, and how each element contributes to achieving that outcome. Ensure that every structural and visual choice has a clear, documented purpose aligned with the user's intent.
+14. When evaluating design choices, apply Occam’s Razor: prefer the simplest solution that effectively meets the user's needs. Avoid adding complexity without a clear, justified purpose.
+15. Hick’s Law: Limit the number of choices presented to the user at any given time. The more options available, the longer it takes for the user to make a decision. Ensure that each choice has a clear purpose and is necessary for the user's task.
