@@ -1,5 +1,5 @@
 export const FORMAT = 'car-maintenance-tracker';
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 export const FUEL_UNITS = ['L', 'US gal', 'Imp gal'];
 
 export class ValidationError extends Error {
@@ -63,11 +63,16 @@ export function dateBounds(value, field = 'date') {
 }
 
 const itemEventKinds = ['maintenance', 'observation'];
+const oilDefaults = { 'oil-life': { oilLife: null }, 'oil-level': { oilLevel: null }, 'oil-top-up': { oilLitres: null } };
 const itemEventDefaults = { itemId: null, action: '', partUsed: '', cost: null };
+
+function hasItemDetails(kind, version) {
+  return version >= 4 && (itemEventKinds.includes(kind) || (version >= 5 && kind === 'oil-change'));
+}
 
 function validateEvent(record, collection, version = SCHEMA_VERSION) {
   const extra = record.kind === 'fueling' ? ['fuelAmount', 'fuelUnit', 'tankStatus'] :
-    version >= 4 && itemEventKinds.includes(record.kind) ? Object.keys(itemEventDefaults) : [];
+    hasItemDetails(record.kind, version) ? Object.keys(itemEventDefaults) : Object.keys(oilDefaults[record.kind] ?? {});
   shape(record, [...eventKeys, ...extra], 'Vehicle activity');
   dateBounds(record.date);
   requireValue(record.odometer === null || (typeof record.odometer === 'number' && Number.isFinite(record.odometer) && record.odometer >= 0 && record.odometer <= Number.MAX_SAFE_INTEGER), 'Enter a nonnegative odometer reading, or leave it blank.', 'odometer');
@@ -76,7 +81,7 @@ function validateEvent(record, collection, version = SCHEMA_VERSION) {
   requireValue(record.kind !== 'odometer' || record.odometer !== null, 'An odometer-only record needs a reading. Choose a car activity to keep other partial history.', 'odometer');
   timestamp(record.createdAt);
   timestamp(record.updatedAt);
-  if (version >= 4 && itemEventKinds.includes(record.kind)) {
+  if (hasItemDetails(record.kind, version)) {
     requireValue(record.itemId === null || collection.items.some(item => item.id === record.itemId && item.vehicleId === record.vehicleId), 'Choose an item belonging to this vehicle.', 'itemId');
     text(record.action, 'action', 200, record.itemId !== null);
     text(record.partUsed, 'partUsed', 500);
@@ -86,6 +91,9 @@ function validateEvent(record, collection, version = SCHEMA_VERSION) {
       requireValue(typeof record.cost.currency === 'string' && /^[A-Z]{3}$/.test(record.cost.currency), 'Enter a three-letter currency, such as CAD.', 'currency');
     }
   }
+  if (record.kind === 'oil-life') requireValue(record.oilLife === null || (typeof record.oilLife === 'number' && Number.isFinite(record.oilLife) && record.oilLife >= 0 && record.oilLife <= 100), 'Enter oil life from 0 to 100%, or leave it blank.', 'oilLife');
+  if (record.kind === 'oil-level') requireValue(record.oilLevel === null || ['low', 'normal', 'high'].includes(record.oilLevel), 'Choose low, normal, high, or unknown oil level.', 'oilLevel');
+  if (record.kind === 'oil-top-up') requireValue(record.oilLitres === null || (typeof record.oilLitres === 'number' && Number.isFinite(record.oilLitres) && record.oilLitres > 0), 'Enter positive top-up litres, or leave it blank.', 'oilLitres');
   if (record.kind === 'fueling') {
     requireValue(record.fuelAmount === null || (typeof record.fuelAmount === 'number' && Number.isFinite(record.fuelAmount) && record.fuelAmount > 0), 'Enter a positive fuel quantity, or leave it blank.', 'fuelAmount');
     requireValue(FUEL_UNITS.includes(record.fuelUnit), 'Choose litres, US gallons, or Imperial gallons.', 'fuelUnit');
@@ -174,7 +182,7 @@ function validateGap(record) {
 }
 
 const recordValidators = new Map([
-  ...['odometer', 'observation', 'fueling', 'oil-change', 'tire-change', 'maintenance'].map(kind => [kind, validateEvent]),
+  ...['odometer', 'observation', 'fueling', 'oil-change', 'oil-life', 'oil-level', 'oil-top-up', 'tire-change', 'maintenance'].map(kind => [kind, validateEvent]),
   ['gap', validateGap],
 ]);
 const versionTwoKinds = ['odometer', 'observation', 'gap'];
@@ -213,6 +221,7 @@ function validateVersion(collection, version) {
   for (const record of collection.records) {
     requireValue(version !== 1, 'Version one does not support factual records.');
     requireValue(version !== 2 || versionTwoKinds.includes(record?.kind), 'This record kind is not supported in version two.');
+    requireValue(version >= 5 || !Object.hasOwn(oilDefaults, record?.kind), 'Oil readings are not supported in this collection version.');
     requireValue(record !== null && typeof record === 'object', 'Record must be an object.');
     unique(record.id);
     requireValue(collection.vehicles.some(vehicle => vehicle.id === record.vehicleId), 'Record refers to a missing vehicle.');
@@ -223,20 +232,20 @@ function validateVersion(collection, version) {
   for (const marker of collection.tombstones) {
     shape(marker, ['id', 'kind', 'deletedAt'], 'Deletion marker');
     unique(marker.id, version >= 3 && marker.kind === 'vehicle');
-    requireValue(marker.kind === 'vehicle' || (version >= 4 && marker.kind === 'item') || (version !== 1 && recordValidators.has(marker.kind) && (version !== 2 || versionTwoKinds.includes(marker.kind))), 'Unsupported deletion kind.');
+    requireValue(marker.kind === 'vehicle' || (version >= 4 && marker.kind === 'item') || (version !== 1 && recordValidators.has(marker.kind) && (version !== 2 || versionTwoKinds.includes(marker.kind)) && (version >= 5 || !Object.hasOwn(oilDefaults, marker.kind))), 'Unsupported deletion kind.');
     timestamp(marker.deletedAt);
   }
   return collection;
 }
 
 export function migrateCollection(collection) {
-  if ([1, 2, 3].includes(collection?.schemaVersion)) {
+  if ([1, 2, 3, 4].includes(collection?.schemaVersion)) {
     validateVersion(collection, collection.schemaVersion);
     const migrated = structuredClone(collection);
     migrated.schemaVersion = SCHEMA_VERSION;
     migrated.vehicles = migrated.vehicles.map(vehicle => ({ fuelUnit: 'L', ...vehicle }));
-    migrated.items = [];
-    migrated.records = migrated.records.map(record => itemEventKinds.includes(record.kind) ? { ...itemEventDefaults, ...record } : record);
+    migrated.items ??= [];
+    migrated.records = migrated.records.map(record => hasItemDetails(record.kind, SCHEMA_VERSION) ? { ...itemEventDefaults, ...record } : record);
     return validateCollection(migrated);
   }
   return validateCollection(collection);
@@ -309,7 +318,7 @@ export function saveSession(collection, defaults, entries) {
   const recordIds = [];
   for (const [index, entry] of entries.entries()) {
     const shared = entry.kind === 'gap' ? { vehicleId: defaults.vehicleId, date: defaults.date } : { odometer: null, ...defaults };
-    const record = { notes: '', ...(itemEventKinds.includes(entry.kind) ? itemEventDefaults : {}), ...shared, ...entry, id: crypto.randomUUID(), createdAt: now, updatedAt: now };
+    const record = { notes: '', ...(hasItemDetails(entry.kind, SCHEMA_VERSION) ? itemEventDefaults : oilDefaults[entry.kind] ?? {}), ...shared, ...entry, id: crypto.randomUUID(), createdAt: now, updatedAt: now };
     try {
       getVehicle(collection, record.vehicleId);
       const validate = recordValidators.get(record.kind);

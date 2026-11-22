@@ -13,7 +13,7 @@
       } catch { /* The system theme remains available when storage is blocked. */ }
     </script>
     <title>Car Maintenance Tracker</title>
-    <link rel="stylesheet" href="./styles.css?v=a1d139dcd575">
+    <link rel="stylesheet" href="./styles.css?v=7bee6046bfda">
   </head>
   <body>
     <header>
@@ -97,6 +97,19 @@
           <ul id="maintenance-list"></ul>
           <button id="add-item" type="button" class="secondary">Add maintenance item</button>
         </section>
+        <section class="oil-section">
+          <h3>Oil</h3>
+          <p id="oil-status"></p>
+          <button id="view-oil" type="button" class="secondary">Oil history and forecast</button>
+        </section>
+      </section>
+
+      <section id="oil-view" aria-labelledby="oil-title" hidden>
+        <button id="oil-summary" type="button" class="secondary">Vehicle summary</button>
+        <h2 id="oil-title" tabindex="-1"></h2>
+        <div id="oil-details"></div>
+        <div id="oil-actions" class="actions"></div>
+        <button id="oil-records" type="button" class="secondary">View oil records</button>
       </section>
 
       <section id="item-view" aria-labelledby="item-title" hidden>
@@ -144,6 +157,14 @@
               <button id="add-maintenance" type="button" class="secondary">Other maintenance</button>
               <button id="add-observation" type="button" class="secondary">Check / inspect</button>
               <button id="add-odometer" type="button" class="secondary">Odometer reading</button>
+              <details id="oil-entry-actions">
+                <summary>Oil checks and top-ups</summary>
+                <div class="actions">
+                  <button id="add-oil-life" type="button" class="secondary">Read oil life</button>
+                  <button id="add-oil-level" type="button" class="secondary">Check oil level</button>
+                  <button id="add-oil-top-up" type="button" class="secondary">Top up oil</button>
+                </div>
+              </details>
             </div>
             <div class="actions history-submit">
               <button id="submit-history" type="submit">Save records</button>
@@ -214,6 +235,6 @@
       </section>
       <noscript><p>JavaScript is needed to open and save your vehicles on this device.</p></noscript>
     </main>
-    <script type="module" src="./app.js?v=a1d139dcd575"></script>
+    <script type="module" src="./app.js?v=7bee6046bfda"></script>
   </body>
 </html>

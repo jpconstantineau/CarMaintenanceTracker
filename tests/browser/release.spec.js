@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { once } from 'node:events';
 
-for (const fixture of ['pre-history-release', 'pre-maintenance-release', 'pre-backup-release']) {
+for (const fixture of ['pre-history-release', 'pre-maintenance-release', 'pre-backup-release', 'pre-oil-release']) {
 test(`a cached ${fixture} upgrades to history and maintenance without clearing browser data`, async ({ page }) => {
   const previous = JSON.parse(await readFile(new URL(`../fixtures/${fixture}.json`, import.meta.url)));
   const current = Object.fromEntries(await Promise.all(Object.keys(previous.assets).map(async name =>
@@ -35,6 +35,18 @@ test(`a cached ${fixture} upgrades to history and maintenance without clearing b
       await page.getByRole('button', { name: 'Save records', exact: true }).click();
       await expect(page.locator('#save-status')).toHaveText('Saved on this device.');
     }
+    if (fixture === 'pre-oil-release') {
+      await page.getByRole('button', { name: 'Add maintenance item', exact: true }).click();
+      await page.getByLabel('Common item').selectOption('Oil filter');
+      await page.getByRole('button', { name: 'Save item', exact: true }).click();
+      await page.getByRole('button', { name: 'Vehicle summary', exact: true }).click();
+      await page.getByRole('button', { name: 'Record history', exact: true }).click();
+      await page.getByRole('button', { name: 'Change oil', exact: true }).click();
+      await page.getByLabel('Date (required)', { exact: true }).fill('2020-06-01');
+      await page.locator('.record-editor').getByLabel('Notes (optional)').fill('Old oil change; 80% in notes is not a reading');
+      await page.getByRole('button', { name: 'Save records', exact: true }).click();
+      await expect(page.locator('#save-status')).toHaveText('Saved on this device.');
+    }
     assets = current;
     // New document, same origin and cached assets: no routes or cache-clearing reload.
     await page.goto(`${url}?updated`);
@@ -46,9 +58,21 @@ test(`a cached ${fixture} upgrades to history and maintenance without clearing b
     await expect(page.getByLabel('Date (required)', { exact: true })).toHaveAttribute('type', 'date');
     await page.getByLabel('Date (required)', { exact: true }).fill('2024-01-02');
     await page.getByRole('button', { name: 'Save records', exact: true }).click();
-    await expect(page.locator('#history-list > li')).toHaveCount(fixture === 'pre-maintenance-release' ? 2 : 1);
+    await expect(page.locator('#history-list > li')).toHaveCount(['pre-maintenance-release', 'pre-oil-release'].includes(fixture) ? 2 : 1);
     if (fixture === 'pre-maintenance-release') await expect(page.locator('#history-list')).toContainText('Earlier unassigned filter replacement');
     await page.getByRole('button', { name: 'Vehicle summary', exact: true }).click();
+    if (fixture === 'pre-oil-release') {
+      await expect(page.locator('#maintenance-list')).toContainText('Oil filter');
+      await page.getByRole('button', { name: 'Oil history and forecast', exact: true }).click();
+      await expect(page.locator('#oil-details')).toContainText('Oil forecast unavailable');
+      await page.getByRole('button', { name: 'View oil records', exact: true }).click();
+      await expect(page.locator('#history-list')).toContainText('Old oil change; 80% in notes is not a reading');
+      await page.getByRole('button', { name: 'Edit record 2', exact: true }).click();
+      await page.getByLabel('Maintenance item (optional)').selectOption({ label: 'Oil filter' });
+      await page.getByRole('button', { name: 'Save record', exact: true }).click();
+      await expect(page.locator('#history-list > li')).toHaveCount(2);
+      await page.getByRole('button', { name: 'Vehicle summary', exact: true }).click();
+    }
     await page.getByRole('button', { name: 'Add maintenance item', exact: true }).click();
     await page.getByLabel('Common item').selectOption('Brakes');
     await page.getByRole('button', { name: 'Save item', exact: true }).click();

@@ -16,10 +16,11 @@ A vanilla HTML/CSS/JavaScript app for personal vehicle maintenance history, host
 - Inspect dated mileage evidence and reopen factual history, including collections saved by the first release.
 - Configure common or custom maintenance items, parts, specifications, brands and reference links per vehicle.
 - Record linked services and inspections with optional parts/cost, and review distance/time due intervals with supporting item history. History-only tracking needs no schedule; condition settings are retained for later specialized measurements.
-
+- Record oil-life percentages, low/normal/high level checks and top-up litres separately from oil changes.
+- Review completed oil-change distances, median/sample count, supported 0%-life forecasts and recorded-mileage calendar estimates in Oil history and forecast.
 - Export JSON backups, preview and merge app JSON by stable IDs, resolve conflicting versions, or replace the collection with a downloadable recovery copy.
 
-Vehicle details and history are stored in this browser on this device. JSON backups provide manual transfer between devices. Detailed oil/tire tracking and condition forecasts, fuel economy and GitHub Gist sync are future tickets. The intended cloud storage remains the user's own GitHub Gist; authentication will use a small Cloudflare Worker.
+Vehicle details and history are stored in this browser on this device. JSON backups provide manual transfer between devices. Detailed tire tracking and forecasts, fuel economy and GitHub Gist sync are future tickets. The intended cloud storage remains the user's own GitHub Gist; authentication will use a small Cloudflare Worker. Schema 5 retains earlier data, including existing oil changes and maintenance items; no development data is cleared.
 
 ## Run and test
 
@@ -50,6 +51,7 @@ On Linux, install browsers with `npx playwright install --with-deps chromium web
 - [History contracts and UI verification ledger](documentation/history.md)
 - [Maintenance contracts and UI verification ledger](documentation/maintenance.md)
 - [JSON backup contracts and UI verification ledger](documentation/backups.md)
+- [Oil contracts and UI verification ledger](documentation/oil.md)
 - [Implementation tickets](.scratch/first-usable-version-build/issues/01-create-and-reopen-vehicles.md)
 
 GitHub Pages publishes `main` → `/docs`. Run the checks before integrating/pushing a ticket, then verify the deployed commit and assets with `node scripts/verify-pages.mjs <full-commit-SHA>` and run the browser journeys against the live site. The release contract documents this workflow. During early development the owner permits schema-version resets instead of migrations; disclose any reset in release notes. The current release retains earlier data.

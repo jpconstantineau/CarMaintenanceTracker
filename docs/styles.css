@@ -112,6 +112,10 @@ input[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--
 #history-error, #item-error { color: var(--error); background: var(--error-surface); padding: var(--space-control); border-radius: var(--corner); overflow-wrap: anywhere; }
 #history-error:empty, #item-error:empty { display: none; }
 .maintenance-section { margin-block-start: var(--space-xl); }
+.oil-section { margin-block-start: var(--space-xl); }
+#oil-summary, #oil-actions { margin-block-end: var(--space-lg); }
+#oil-details, #oil-status { overflow-wrap: anywhere; }
+#oil-entry-actions > summary { min-block-size: var(--target); padding-block: var(--space-control); cursor: pointer; }
 #maintenance-list { list-style: none; padding: 0; }
 #maintenance-list > li { margin-block-end: var(--space-md); }
 #maintenance-list p, #item-details { overflow-wrap: anywhere; }

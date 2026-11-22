@@ -1,10 +1,11 @@
-import { createCollection, getVehicle, saveVehicle, removeVehicle, getRecord, saveSession, updateRecord, removeRecord, listItems, saveItem, removeItem, COMMON_ITEMS, HISTORY_TYPES } from './history.js?v=a1d139dcd575';
-import { summarizeVehicle, vehicleHistory, maintenanceSummary } from './calculations.js?v=a1d139dcd575';
-import { serialize, deserialize, previewMerge, applyMerge } from './storage.js?v=a1d139dcd575';
+import { createCollection, getVehicle, saveVehicle, removeVehicle, getRecord, saveSession, updateRecord, removeRecord, listItems, saveItem, removeItem, COMMON_ITEMS, HISTORY_TYPES } from './history.js?v=7bee6046bfda';
+import { summarizeVehicle, vehicleHistory, maintenanceSummary, oilSummary } from './calculations.js?v=7bee6046bfda';
+import { serialize, deserialize, previewMerge, applyMerge } from './storage.js?v=7bee6046bfda';
 
 const dateLabel = date => `${date}${date.length === 4 ? ' (year known)' : date.length === 7 ? ' (month known)' : ''}`;
 const mileageLabel = (value, unit) => value === null ? 'Mileage unknown' : `${new Intl.NumberFormat('en', { maximumFractionDigits: 3 }).format(value)} ${unit}`;
-const kindLabels = { observation: 'Check / inspection', odometer: 'Odometer reading', gap: 'Missing records', fueling: 'Fueling', 'oil-change': 'Oil change', 'tire-change': 'Tire change', maintenance: 'Maintenance' };
+const kindLabels = { observation: 'Check / inspection', odometer: 'Odometer reading', gap: 'Missing records', fueling: 'Fueling', 'oil-change': 'Oil change', 'oil-life': 'Oil-life reading', 'oil-level': 'Oil-level check', 'oil-top-up': 'Oil top-up', 'tire-change': 'Tire change', maintenance: 'Maintenance' };
+const oilActions = [['oil-change', 'Change oil'], ['oil-life', 'Read oil life'], ['oil-level', 'Check oil level'], ['oil-top-up', 'Top up oil']];
 const fuelUnitLabels = { L: 'Litres (L)', 'US gal': 'US gallons (US gal)', 'Imp gal': 'Imperial gallons (Imp gal)' };
 
 export async function start(document, storage) {
@@ -57,7 +58,7 @@ export async function start(document, storage) {
   }
 
   function screen(id, focusId) {
-    for (const name of ['selection', 'vehicle-summary', 'vehicle-editor', 'history-view', 'history-editor', 'item-view', 'item-editor', 'backups']) byId(name).hidden = name !== id;
+    for (const name of ['selection', 'vehicle-summary', 'vehicle-editor', 'history-view', 'history-editor', 'item-view', 'item-editor', 'oil-view', 'backups']) byId(name).hidden = name !== id;
     byId('open-backups').hidden = !loaded || id.endsWith('editor') || id === 'backups';
     if (focusId) byId(focusId).focus();
   }
@@ -95,6 +96,7 @@ export async function start(document, storage) {
       `${mileageLabel(summary.odometer.value, summary.odometer.unit)} — ${summary.odometer.date ? dateLabel(summary.odometer.date) : summary.odometer.reason}`;
     byId('summary-history').textContent = `${summary.history.count ? `${summary.history.count} records.` : 'No entries yet.'} ${summary.history.reason}`;
     byId('summary-notes').textContent = vehicle.notes || 'No notes added.';
+    byId('oil-status').textContent = oilLabel(oilSummary(snapshot.collection, vehicle.id));
     const maintenance = byId('maintenance-list');
     maintenance.replaceChildren();
     for (const summary of itemSummaries()) {
@@ -271,7 +273,64 @@ export async function start(document, storage) {
     return parts.join(' · ');
   }
 
+  function oilLabel(summary) {
+    const forecast = summary.forecast;
+    if (!forecast) return 'Oil forecast unavailable';
+    if (forecast.source === 'observed') return 'Due — recorded oil life is 0%';
+    return `${forecast.source === 'fit' ? 'Projected 0% oil life' : 'Historical-median estimate'} at ${mileageLabel(forecast.dueMileage, summary.unit)}`;
+  }
+
+  function showOil() {
+    if (busy) return;
+    const vehicle = getVehicle(snapshot.collection, snapshot.selectedVehicleId);
+    const summary = oilSummary(snapshot.collection, vehicle.id);
+    const forecast = summary.forecast;
+    byId('oil-title').textContent = `Oil — ${vehicle.name}`;
+    const details = byId('oil-details');
+    details.replaceChildren(element('p', oilLabel(summary)), element('p', summary.coverage));
+    if (forecast?.source === 'fit') {
+      details.append(element('p', `${mileageLabel(forecast.remainingDistance, summary.unit)} remaining at ${dateLabel(forecast.reference.date)} · ${mileageLabel(forecast.reference.odometer, forecast.reference.odometerUnit)} · ${forecast.reference.oilLife}%`));
+      if (forecast.limited) details.append(element('p', 'Limited evidence: 2 readings'));
+      const support = element('ul');
+      for (const record of forecast.support) support.append(element('li', `${dateLabel(record.date)} · ${mileageLabel(record.odometer, record.odometerUnit)} · ${record.oilLife}%`));
+      details.append(element('h3', 'Oil-life evidence'), support);
+    } else if (forecast?.source === 'observed') {
+      details.append(element('p', `${dateLabel(forecast.reference.date)} · ${mileageLabel(forecast.reference.odometer, forecast.reference.odometerUnit)} · 0%`));
+    } else if (forecast?.source === 'historical') {
+      details.append(element('p', `Historical fallback from ${summary.count} completed intervals and the recorded change at ${dateLabel(summary.lastChange.date)} · ${mileageLabel(summary.lastChange.odometer, summary.lastChange.odometerUnit)}.`));
+      if (forecast.remainingDistance !== null) details.append(element('p', `${mileageLabel(forecast.remainingDistance, summary.unit)} remaining at latest recorded mileage · ${forecast.reference.date ? dateLabel(forecast.reference.date) : 'date uncertain'} · ${mileageLabel(forecast.reference.value, summary.unit)}`));
+    }
+    for (const reason of summary.reasons) details.append(element('p', reason));
+    if (forecast && forecast.source !== 'observed') details.append(element('p', 'Estimate only; the vehicle’s actual 0% oil-life indication remains the change trigger.'));
+    const statistics = element('dl');
+    statistics.append(element('dt', 'Completed oil-change intervals'), element('dd', String(summary.count)),
+      element('dt', 'Median completed distance'), element('dd', summary.median === null ? 'Unknown' : mileageLabel(summary.median, summary.unit)));
+    details.append(statistics);
+    if (summary.intervals.length) {
+      const intervals = element('ul');
+      for (const interval of summary.intervals) intervals.append(element('li', `${dateLabel(interval.from.date)} · ${mileageLabel(interval.from.odometer, interval.from.odometerUnit)} to ${dateLabel(interval.to.date)} · ${mileageLabel(interval.to.odometer, interval.to.odometerUnit)}: ${mileageLabel(interval.distance, summary.unit)}`));
+      details.append(element('h3', 'Individual completed intervals'), intervals);
+    }
+    if (summary.calendar) {
+      const calendar = summary.calendar;
+      details.append(element('h3', 'Estimated calendar date'), element('p', `${calendar.date} — based on ${mileageLabel(calendar.rate, summary.unit)} per day and ${mileageLabel(calendar.remainingDistance, summary.unit)} remaining at ${calendar.support[1].date}.`));
+      const support = element('ul');
+      for (const point of calendar.support) support.append(element('li', `${point.date} · ${mileageLabel(point.recordedValue, point.recordedUnit)}`));
+      details.append(support);
+    } else if (forecast && forecast.source !== 'observed') details.append(element('p', summary.calendarReason));
+    byId('oil-actions').replaceChildren(...oilActions.map(([kind, label]) => button(label, () => {
+      historyItemId = 'oil';
+      openHistoryEditor();
+      addDraft(kind);
+    })));
+    screen('oil-view', 'oil-title');
+  }
+  byId('view-oil').addEventListener('click', showOil);
+  byId('oil-summary').addEventListener('click', () => { if (!busy) render(); });
+  byId('oil-records').addEventListener('click', () => { if (!busy) showHistory('oil'); });
+
   function itemAction(kind, item) {
+    if (kind === 'oil-change') return 'Change oil';
     return `${kind === 'observation' ? 'Inspect' : item.name.toLowerCase().includes('brake') ? 'Service' : 'Replace'} ${item.name}`;
   }
 
@@ -432,9 +491,10 @@ export async function start(document, storage) {
     render(false);
     const vehicle = getVehicle(snapshot.collection, snapshot.selectedVehicleId);
     const item = listItems(snapshot.collection, vehicle.id).find(item => item.id === itemId);
-    byId('history-title').textContent = `History — ${item ? `${item.name} — ` : ''}${vehicle.name}`;
+    byId('history-title').textContent = `History — ${item ? `${item.name} — ` : itemId === 'oil' ? 'Oil — ' : ''}${vehicle.name}`;
     const history = vehicleHistory(snapshot.collection, vehicle.id);
     if (item) history.records = history.records.filter(record => record.itemId === itemId);
+    if (itemId === 'oil') history.records = history.records.filter(record => record.kind.startsWith('oil-') || (record.kind === 'gap' && ['all', 'oil', 'maintenance', 'observation', 'odometer'].includes(record.historyType)));
     byId('history-empty').hidden = history.records.length > 0;
     const list = byId('history-list');
     list.replaceChildren();
@@ -444,6 +504,9 @@ export async function start(document, storage) {
       if (record.itemId) row.append(element('p', `${kindLabels[record.kind]} · ${listItems(snapshot.collection, record.vehicleId).find(item => item.id === record.itemId).name}`));
       row.append(element('p', record.kind === 'gap' ? `${record.historyType} history missing through ${dateLabel(record.endDate)}` : mileageLabel(record.odometer, record.odometerUnit)));
       if (record.kind === 'fueling') row.append(element('p', `${record.fuelAmount === null ? 'Fuel quantity unknown' : `${record.fuelAmount} ${record.fuelUnit}`} — ${record.tankStatus === 'unknown' ? 'tank status unknown' : `${record.tankStatus} tank`}`));
+      if (record.kind === 'oil-life') row.append(element('p', record.oilLife === null ? 'Oil life unknown' : `Oil life: ${record.oilLife}%`));
+      if (record.kind === 'oil-level') row.append(element('p', `Oil level: ${record.oilLevel ?? 'unknown'}`));
+      if (record.kind === 'oil-top-up') row.append(element('p', record.oilLitres === null ? 'Top-up quantity unknown' : `Oil added: ${record.oilLitres} L`));
       if (record.notes) row.append(element('p', record.notes, 'record-notes'));
       if (record.partUsed) row.append(element('p', `Part used: ${record.partUsed}`));
       if (record.cost) row.append(element('p', `Cost: ${record.cost.amount} ${record.cost.currency}`));
@@ -540,7 +603,7 @@ export async function start(document, storage) {
     const vehicleControl = historyField(row, 'vehicleId', 'Vehicle', record?.vehicleId ?? vehicle.id, {
       choices: snapshot.collection.vehicles.map(value => [value.id, value.name]),
     });
-    if (['maintenance', 'observation'].includes(kind)) {
+    if (['maintenance', 'observation', 'oil-change'].includes(kind)) {
       const itemControl = historyField(row, 'itemId', 'Maintenance item (optional)', record?.itemId ?? selectedItem?.id ?? '', { choices: [] });
       const action = historyField(row, 'action', 'Action performed (required with item)', record?.action ?? (selectedItem ? itemAction(kind, selectedItem) : ''), { maxLength: 200 });
       function choices() {
@@ -558,7 +621,7 @@ export async function start(document, storage) {
       itemControl.addEventListener('change', () => {
         const item = listItems(snapshot.collection, vehicleControl.value).find(item => item.id === itemControl.value);
         action.required = Boolean(item);
-        if (!record) action.value = item ? itemAction(kind, item) : '';
+        if (!record || !action.value) action.value = item ? itemAction(kind, item) : '';
       });
       vehicleControl.addEventListener('change', choices);
     }
@@ -575,7 +638,13 @@ export async function start(document, storage) {
       historyField(row, 'fuelAmount', 'Fuel added (optional)', record?.fuelAmount ?? null);
       historyField(row, 'tankStatus', 'Tank after fueling', record?.tankStatus ?? 'unknown', { choices: [['unknown', 'Unknown'], ['full', 'Full'], ['partial', 'Partial']] });
     }
-    if (['maintenance', 'observation'].includes(kind)) {
+    if (kind === 'oil-life') {
+      const life = historyField(row, 'oilLife', 'Oil life (%, optional)', record?.oilLife ?? null, { numeric: true });
+      life.max = '100';
+    }
+    if (kind === 'oil-level') historyField(row, 'oilLevel', 'Oil level', record?.oilLevel ?? '', { choices: [['', 'Unknown'], ['low', 'Low'], ['normal', 'Normal'], ['high', 'High']] });
+    if (kind === 'oil-top-up') historyField(row, 'oilLitres', 'Oil added (litres, optional)', record?.oilLitres ?? null, { numeric: true });
+    if (['maintenance', 'observation', 'oil-change'].includes(kind)) {
       historyField(row, 'partUsed', 'Part used (optional)', record?.partUsed ?? '', { maxLength: 500 });
       historyField(row, 'costAmount', 'Cost amount (optional)', record?.cost?.amount ?? '', { numeric: true });
       historyField(row, 'currency', 'Currency (three letters, required with cost)', record?.cost?.currency ?? '', { maxLength: 3 });
@@ -604,6 +673,7 @@ export async function start(document, storage) {
     byId('history-editor-title').textContent = historyEditing ? 'Edit history record' : 'Record history';
     byId('history-vehicle').textContent = getVehicle(snapshot.collection, snapshot.selectedVehicleId).name;
     byId('session-add-actions').hidden = historyEditing;
+    byId('oil-entry-actions').open = false;
     byId('submit-history').textContent = historyEditing ? 'Save record' : 'Save records';
     byId('submit-history').hidden = !historyEditing;
     byId('retry').hidden = true;
@@ -642,7 +712,8 @@ export async function start(document, storage) {
       const invalid = controls.find(control => !control.disabled && !control.validity.valid);
       if (invalid) { historyError(invalid, invalid.validationMessage); return; }
       const details = Object.fromEntries(controls.map(control => [control.dataset.field, control.value]));
-      for (const key of ['odometer', 'fuelAmount']) if (key in details) details[key] = details[key] === '' ? null : Number(details[key]);
+      for (const key of ['odometer', 'fuelAmount', 'oilLife', 'oilLitres']) if (key in details) details[key] = details[key] === '' ? null : Number(details[key]);
+      if ('oilLevel' in details) details.oilLevel ||= null;
       if ('itemId' in details) {
         details.itemId ||= null;
         details.cost = details.costAmount === '' ? null : { amount: Number(details.costAmount), currency: details.currency.toUpperCase() };
@@ -674,7 +745,10 @@ export async function start(document, storage) {
   byId('history-add').addEventListener('click', () => openHistoryEditor());
   byId('view-history').addEventListener('click', () => { if (!busy) showHistory(null); });
   byId('history-summary').addEventListener('click', () => { if (!busy) render(); });
-  for (const kind of ['fueling', 'oil-change', 'tire-change', 'maintenance', 'observation', 'odometer']) byId(`add-${kind}`).addEventListener('click', () => addDraft(kind));
+  for (const kind of ['fueling', 'oil-change', 'oil-life', 'oil-level', 'oil-top-up', 'tire-change', 'maintenance', 'observation', 'odometer']) byId(`add-${kind}`).addEventListener('click', () => {
+    addDraft(kind);
+    byId('oil-entry-actions').open = false;
+  });
   byId('history-gap').addEventListener('click', () => {
     if (busy) return;
     openHistoryEditor();
