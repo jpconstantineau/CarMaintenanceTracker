@@ -1,6 +1,6 @@
 # Local vehicle foundation
 
-The first-release contract below is retained for compatibility context. [Dated history](history.md) documents the current schema 3, Base36 timestamp vehicle IDs, fuel units, earlier-schema loading, additional public operations, and current UI verification. The owner permits resetting development data when a future schema change needs it; migration work is optional during this early stage.
+The first-release contract below is retained for compatibility context. [Dated history](history.md) documents schema 3, Base36 timestamp vehicle IDs, fuel units and historical entry; [maintenance items](maintenance.md) documents the current schema 4, item operations, due intervals and UI verification. The owner permits resetting development data when a future schema change needs it; migration work is optional during this early stage.
 
 Ticket: `.scratch/first-usable-version-build/issues/01-create-and-reopen-vehicles.md`.
 

@@ -2,6 +2,8 @@
 
 Ticket: `.scratch/first-usable-version-build/issues/02-record-and-correct-history.md`.
 
+This records the schema 3 history slice. [Maintenance items](maintenance.md) extends it in schema 4 with item references, concrete actions, parts/cost and due intervals; prior records retain their facts without inferred assignments.
+
 The task is to record a car action (fueling, changing oil or tires, other maintenance, checking/inspecting the car, or reading its odometer), inspect its history, correct a record, and reopen saved data. Success preserves each action's identity, units, unknowns and date precision; an inspection does not imply completed service. Missing-history annotations are secondary to these car actions.
 
 ## Public interfaces and persistence

@@ -49,6 +49,8 @@ Modern web guidance: retrieved `forms`; applied native semantics, visible labels
 
 ## Verification and release
 
+Final local verification: 34 module tests and 83 browser tests passed; the existing WebKit forced-colors emulation test remains skipped. Modified runtime modules pass JavaScript syntax checks, and every transitive runtime URL carries content version `313a75df76a0`. Standards and specification reviews confirmed no outstanding findings after the shared chronology comparison, conditional action label, item-removal and full-length action fixes.
+
 `node --check` checks the modified runtime modules; this vanilla-JavaScript project has no configured static typechecker. Public module cases test item ownership, links, schedules, round trips, inspections, multi-year backfills/corrections/removals, leap-month ranges, unknowns, ambiguity, gaps and conflicting/future evidence. Browser journeys cover desktop/phone Chromium and phone WebKit, real IndexedDB retry, keyboard validation, long/literal text, dark-theme draft retention, 320px/200% reflow, and upgrades with both the original v1 and immediately preceding v3 runtime assets cached. The v3 upgrade retains an older unassigned maintenance note.
 
 Screenshots are produced under ignored `test-results/maintenance-*/`: `maintenance-detail.png` and `maintenance-dark-narrow.png`. Physical phone keyboard behavior and real assistive-technology reading remain human checks. Release evidence is recorded in issue 03 after the published assets and live journeys pass. No authentication or Worker change is part of this release.
