@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** complete
 
 **Source specification:** [CarMaintenanceTracker: first usable version](../../first-usable-version/spec.md). Relevant sections: Implementation Decisions 1–5, 9; Testing Decisions.
 
@@ -12,18 +12,18 @@
 
 ## Acceptance criteria
 
-- [ ] Keep the runtime vanilla HTML/CSS/JavaScript and provide the vehicle selection/create screen followed by a selected-vehicle summary. Creation requires only a recognizable name and miles/kilometres; make/model/year/notes are optional.
-- [ ] Allow several vehicles, editing their identifying details and switching between them without mixing data. An old vehicle with no historical readings is a valid collection; display missing mileage/history honestly.
-- [ ] Establish stable collection/record IDs, the application format/schema version, the shared validated serialization contract, and extension points for later typed records. Preserve factual values rather than persisting forecasts as authoritative data.
-- [ ] Establish the four agreed module interfaces and initialize IndexedDB, using the highest useful public interfaces. Do only the refactoring necessary for this working slice; no separate framework migration.
-- [ ] Automatically save recorded changes locally and prove that reopening restores the selected collection. Display local-save success only after the transaction completes; on failure preserve editable work and expose the failure.
-- [ ] Create the test harness and representative phone/desktop browser coverage for creation, editing, multiple-vehicle isolation, reopening, and storage failure. Exercise real IndexedDB in browser integration coverage.
-- [ ] Make labels, keyboard access, responsive entry, and validation usable; apply purposeful-web-design and retain its required purpose/verification ledger for the actual UI.
+- [x] Keep the runtime vanilla HTML/CSS/JavaScript and provide the vehicle selection/create screen followed by a selected-vehicle summary. Creation requires only a recognizable name and miles/kilometres; make/model/year/notes are optional.
+- [x] Allow several vehicles, editing their identifying details and switching between them without mixing data. An old vehicle with no historical readings is a valid collection; display missing mileage/history honestly.
+- [x] Establish stable collection/record IDs, the application format/schema version, the shared validated serialization contract, and extension points for later typed records. Preserve factual values rather than persisting forecasts as authoritative data.
+- [x] Establish the four agreed module interfaces and initialize IndexedDB, using the highest useful public interfaces. Do only the refactoring necessary for this working slice; no separate framework migration.
+- [x] Automatically save recorded changes locally and prove that reopening restores the selected collection. Display local-save success only after the transaction completes; on failure preserve editable work and expose the failure.
+- [x] Create the test harness and representative phone/desktop browser coverage for creation, editing, multiple-vehicle isolation, reopening, and storage failure. Exercise real IndexedDB in browser integration coverage.
+- [x] Make labels, keyboard access, responsive entry, and validation usable; apply purposeful-web-design and retain its required purpose/verification ledger for the actual UI.
 
-- [ ] Verify or establish the repository's GitHub Pages publishing source and a reliable per-ticket deployment/verification path. Publish this first local-vehicle slice with working controls; clearly distinguish later unavailable features from usable actions.
-- [ ] After this ticket's checks pass, integrate its changes through the repository workflow into the configured GitHub Pages publishing branch, commit and push to GitHub, wait for the Pages deployment to finish, and verify the published app at https://jpconstantineau.github.io/CarMaintenanceTracker/. A feature-branch push or local test alone does not complete the ticket.
-- [ ] Verify that user records from preceding published versions remain usable. Include and test non-destructive migrations if this slice changes the persisted format; never reset IndexedDB, change stable identities, or discard earlier observations merely to ship the next feature.
-- [ ] Report the live app URL, deployed commit/release evidence, and short steps the user can perform to test this slice. Complete each ticket only after its working feature is available live; coordinate a compatible Worker deployment when authentication code changes.
+- [x] Verify or establish the repository's GitHub Pages publishing source and a reliable per-ticket deployment/verification path. Publish this first local-vehicle slice with working controls; clearly distinguish later unavailable features from usable actions.
+- [x] After this ticket's checks pass, integrate its changes through the repository workflow into the configured GitHub Pages publishing branch, commit and push to GitHub, wait for the Pages deployment to finish, and verify the published app at https://jpconstantineau.github.io/CarMaintenanceTracker/. A feature-branch push or local test alone does not complete the ticket.
+- [x] Verify that user records from preceding published versions remain usable. Include and test non-destructive migrations if this slice changes the persisted format; never reset IndexedDB, change stable identities, or discard earlier observations merely to ship the next feature.
+- [x] Report the live app URL, deployed commit/release evidence, and short steps the user can perform to test this slice. Complete each ticket only after its working feature is available live; coordinate a compatible Worker deployment when authentication code changes.
 
 ## Delivery after this ticket
 
@@ -37,3 +37,15 @@ Work from the source specification and [domain glossary](../../../GLOSSARY.md). 
 
 The user approved this breakdown on 2026-11-21. This ticket is ready for implementation once its blockers are complete; the closed wayfinder decisions remain separate.
 
+## Verified release — 2026-11-21
+
+- Live app: https://jpconstantineau.github.io/CarMaintenanceTracker/
+- Implementation commit: [a936278b51e7eb41b41fe3dcce66859100cabcfa](https://github.com/jpconstantineau/CarMaintenanceTracker/commit/a936278b51e7eb41b41fe3dcce66859100cabcfa), integrated and pushed to `main`.
+- Publishing source verified through GitHub API: `main` / `/docs`.
+- [Pages deployment succeeded](https://github.com/jpconstantineau/CarMaintenanceTracker/actions/runs/44977965799); the build reports the implementation SHA, and all seven runtime assets match the commit.
+- [GitHub application checks passed](https://github.com/jpconstantineau/CarMaintenanceTracker/actions/runs/44977966887). Local verification: 12 module tests and 30 browser tests. Published-site verification: 12 additional successful journeys across desktop Chromium, phone Chromium and phone WebKit.
+- Coverage includes name/units-only creation, optional details, edits, independent vehicles, selected collection restoration, full browser restart, keyboard validation, long/literal text, real IndexedDB commit/abort/retry, stale-tab protection, v1 fixture preservation, and refusal to overwrite unsupported stored versions.
+- The preceding scaffold had no persisted records; no migration or reset was needed. The permanent v1 fixture establishes compatibility coverage for the next release. No authentication/Worker code changed.
+- [Module and release contracts](../../../documentation/vehicle-foundation.md) and [purpose/verification ledger](../../../documentation/vehicle-ui-ledger.md) are retained. Physical phone keyboard and real screen-reader testing remain human checks; automated emulation does not claim those checks.
+
+Try it: Add a vehicle with a name and units, edit its optional details, then add a second vehicle through All vehicles. Switch back to the first vehicle, wait for “Saved on this device,” and close/reopen the browser. The selected vehicle and its details return. Missing mileage/history stays unknown. Data is local to this browser/device; Gist sync and JSON transfer are later tickets.
