@@ -4,16 +4,18 @@ A vanilla HTML/CSS/JavaScript app for personal vehicle maintenance history, host
 
 ## Available now
 
-- Create several vehicles with just a name and miles/kilometres.
-- Edit optional make, model, year and notes, and switch between vehicles.
+- Create several vehicles with a name, miles/kilometres, and fuel units (litres, US gallons, or Imperial gallons).
+- Expand Optional details for make, model, year and notes; rename vehicles without changing their Base36 timestamp IDs.
+- Delete a vehicle and its history with confirmation, or switch between vehicles.
 - Automatically save recorded details locally in IndexedDB and reopen the last selected vehicle.
 - See honest missing-mileage/history states and recover from failed local saves without losing the open form.
 - Choose System, Light or Dark in the header; the preference persists on this device.
-- Record odometer readings, general observations, and known gaps, using exact dates or month/year precision.
-- Enter several independent records with shared defaults; backfill, correct, or remove them and review mileage conflicts.
+- Record fueling, oil changes, tire changes, other maintenance, checks/inspections, and odometer readings.
+- Enter each record's date and mileage independently, using native date pickers and numeric odometer inputs. Approximate month/year dates remain available.
+- Backfill, correct, or remove individual records, review mileage conflicts, and mark missing records separately in history.
 - Inspect dated mileage evidence and reopen factual history, including collections saved by the first release.
 
-Vehicle details and history are stored in this browser on this device. Maintenance-item entry, tires, fueling, forecasts, JSON transfer and GitHub Gist sync are future tickets. The intended cloud storage remains the user's own GitHub Gist; authentication will use a small Cloudflare Worker.
+Vehicle details and history are stored in this browser on this device. Maintenance schedules, detailed oil/tire tracking, fuel economy, forecasts, JSON transfer and GitHub Gist sync are future tickets. The intended cloud storage remains the user's own GitHub Gist; authentication will use a small Cloudflare Worker.
 
 ## Run and test
 
@@ -30,6 +32,8 @@ Open http://127.0.0.1:4173/.
 npx playwright install chromium webkit
 npm run check
 ```
+
+After changing runtime files in `docs/`, run `npm run version:assets` and commit the updated module/stylesheet URLs. `npm run check` verifies their content-derived version before testing. This prevents a returning browser from combining newly deployed HTML with older cached JavaScript.
 
 On Linux, install browsers with `npx playwright install --with-deps chromium webkit`. Tests cover the public module interfaces and real IndexedDB in desktop Chromium, phone Chromium and phone WebKit. The app itself has no runtime dependencies or build step.
 

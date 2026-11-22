@@ -7,6 +7,22 @@ import { serialize, deserialize } from '../docs/storage.js';
 
 const details = { name: 'Older car', odometerUnit: 'km', make: '', model: '', year: null, notes: '' };
 
+test('new vehicle IDs are Base36 timestamps, remain stable on rename, and avoid same-millisecond collisions', t => {
+  const instant = 1795318400000;
+  t.mock.method(Date, 'now', () => instant);
+  const first = saveVehicle(createCollection(), details);
+  assert.equal(first.vehicleId, instant.toString(36));
+  const second = saveVehicle(first.collection, { ...details, name: 'Second' });
+  assert.notEqual(second.vehicleId, first.vehicleId);
+  assert.equal(second.vehicleId, (instant + 1).toString(36));
+  const renamed = saveVehicle(second.collection, { ...details, name: 'Renamed' }, first.vehicleId);
+  assert.equal(renamed.vehicleId, first.vehicleId);
+  const deleted = removeVehicle(renamed.collection, first.vehicleId);
+  const third = saveVehicle(deleted, details);
+  assert.notEqual(third.vehicleId, first.vehicleId);
+  assert.deepEqual(deserialize(serialize(third.collection)), third.collection);
+});
+
 test('name and units suffice; a 15-year-old car does not invent mileage or history', () => {
   const original = createCollection();
   const result = saveVehicle(original, { name: 'Older car', odometerUnit: 'km', year: 2011 });
@@ -54,10 +70,10 @@ test('deletion markers survive serialization without reusing identities', () => 
 test('v1 fixture preserves records, deletion markers, original values and identity', async () => {
   const fixture = JSON.parse(await readFile(new URL('./fixtures/collection-v1.json', import.meta.url)));
   const migrated = deserialize(JSON.stringify(fixture));
-  assert.deepEqual(migrated, { ...fixture, schemaVersion: 2 });
+  assert.deepEqual(migrated, { ...fixture, schemaVersion: 3, vehicles: fixture.vehicles.map(vehicle => ({ ...vehicle, fuelUnit: 'L' })) });
   assert.deepEqual(deserialize(serialize(migrated)), migrated);
   const result = saveVehicle(migrated, { ...details, name: 'Another car' });
-  assert.deepEqual(result.collection.vehicles[0], fixture.vehicles[0]);
+  assert.deepEqual(result.collection.vehicles[0], { ...fixture.vehicles[0], fuelUnit: 'L' });
   assert.deepEqual(result.collection.tombstones, fixture.tombstones);
 });
 

@@ -63,6 +63,8 @@ h1, h2 { font-weight: 600; overflow-wrap: anywhere; }
 fieldset { border: 0; padding: 0; margin: 0; min-inline-size: 0; }
 legend { font-weight: 600; padding: 0; margin-block-end: var(--space-sm); }
 .field, .units { margin-block-end: var(--space-md); }
+#optional-vehicle-details { margin-block-end: var(--space-md); }
+#optional-vehicle-details > summary { min-block-size: var(--target); padding-block: var(--space-control); font-weight: 600; cursor: pointer; }
 .field > label { display: block; font-weight: 600; margin-block-end: var(--space-xs); }
 .hint { color: var(--secondary); margin-block: var(--space-xs) var(--space-sm); }
 input, textarea, select, button { font: inherit; }

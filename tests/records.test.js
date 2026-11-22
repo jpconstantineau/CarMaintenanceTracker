@@ -158,3 +158,50 @@ test('equal mileage is nonconflicting but overlapping approximate dates still ha
   const later = History.saveSession(saved.collection, { vehicleId, odometerUnit: 'km', odometer: 100 }, [{ kind: 'odometer', date: '2025-01-01' }]);
   assert.equal(summarizeVehicle(later.collection, vehicleId).odometer.date, '2025-01-01');
 });
+
+test('car activities retain their actual kind and fueling facts through edits and reopening', () => {
+  const { collection, vehicleId } = vehicle();
+  const saved = History.saveSession(collection, { vehicleId, date: '2024-06-01', odometer: 120000, odometerUnit: 'km' }, [
+    { kind: 'fueling', fuelAmount: 42.5, fuelUnit: 'L', tankStatus: 'full' },
+    { kind: 'oil-change', notes: '5W-30 and new filter' },
+    { kind: 'tire-change', notes: 'Summer tires installed' },
+    { kind: 'maintenance', notes: 'Replaced cabin air filter' },
+    { kind: 'observation', notes: 'Checked coolant level' },
+  ]);
+  const reopened = deserialize(serialize(saved.collection));
+  assert.deepEqual(reopened.records.map(record => record.kind), ['fueling', 'oil-change', 'tire-change', 'maintenance', 'observation']);
+  assert.equal(reopened.records[0].fuelAmount, 42.5);
+  assert.equal(reopened.records[0].tankStatus, 'full');
+  assert.equal(mileageEvidence(reopened, vehicleId).points.length, 5);
+  assert.throws(() => History.updateRecord(reopened, saved.recordIds[0], { fuelAmount: 0 }));
+  const partial = History.updateRecord(reopened, saved.recordIds[0], { fuelAmount: null, odometer: null, tankStatus: 'unknown' });
+  assert.equal(deserialize(serialize(partial)).records[0].fuelAmount, null);
+});
+
+test('deleting a vehicle deletes only its history and retains all deletion identities', () => {
+  const first = vehicle();
+  const second = History.saveVehicle(first.collection, { name: 'Keep me', odometerUnit: 'mi' });
+  const saved = History.saveSession(second.collection, { date: '2024-01-01', odometerUnit: 'km' }, [
+    { kind: 'oil-change', vehicleId: first.vehicleId },
+    { kind: 'observation', vehicleId: second.vehicleId, notes: 'Keep this history' },
+  ]);
+  const removed = History.removeVehicle(saved.collection, first.vehicleId);
+  assert.equal(removed.vehicles.length, 1);
+  assert.equal(removed.vehicles[0].id, second.vehicleId);
+  assert.deepEqual(removed.records, [saved.collection.records[1]]);
+  assert.deepEqual(new Set(removed.tombstones.map(marker => marker.id)), new Set([first.vehicleId, saved.recordIds[0]]));
+  assert.deepEqual(deserialize(serialize(removed)), removed);
+});
+
+test('fuel units distinguish litres, US gallons, and Imperial gallons without reinterpreting older entries', () => {
+  const first = History.saveVehicle(History.createCollection(), { name: 'Car', odometerUnit: 'mi', fuelUnit: 'US gal' });
+  const saved = History.saveSession(first.collection, { vehicleId: first.vehicleId, date: '2024-01-01', odometerUnit: 'mi' }, [
+    { kind: 'fueling', fuelAmount: 10, fuelUnit: 'US gal', tankStatus: 'full' },
+  ]);
+  const changed = History.saveVehicle(saved.collection, { name: 'Car', odometerUnit: 'mi', fuelUnit: 'Imp gal' }, first.vehicleId);
+  assert.equal(History.getVehicle(changed.collection, first.vehicleId).fuelUnit, 'Imp gal');
+  assert.equal(History.getRecord(changed.collection, saved.recordIds[0]).fuelUnit, 'US gal');
+  assert.equal(History.getRecord(changed.collection, saved.recordIds[0]).fuelAmount, 10);
+  assert.deepEqual(deserialize(serialize(changed.collection)), changed.collection);
+  assert.throws(() => History.updateRecord(changed.collection, saved.recordIds[0], { fuelUnit: 'gal' }));
+});

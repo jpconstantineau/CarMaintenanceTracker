@@ -13,7 +13,7 @@
       } catch { /* The system theme remains available when storage is blocked. */ }
     </script>
     <title>Car Maintenance Tracker</title>
-    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./styles.css?v=cf4ee93be591">
   </head>
   <body>
     <header>
@@ -47,6 +47,7 @@
         <p id="vehicle-description"></p>
         <dl>
           <dt>Odometer units</dt><dd id="summary-units"></dd>
+          <dt>Fuel units</dt><dd id="summary-fuel-units"></dd>
           <dt>Latest known mileage</dt><dd id="summary-mileage"></dd>
           <dt>Vehicle history</dt><dd id="summary-history"></dd>
           <dt>Notes</dt><dd id="summary-notes"></dd>
@@ -62,6 +63,7 @@
         <button id="history-summary" type="button" class="secondary">Vehicle summary</button>
         <h2 id="history-title" tabindex="-1"></h2>
         <button id="history-add" type="button">Record history</button>
+        <button id="history-gap" type="button" class="secondary">Mark missing records</button>
         <p id="history-empty">No entries yet.</p>
         <ol id="history-list"></ol>
       </section>
@@ -71,23 +73,14 @@
         <form id="history-form" aria-labelledby="history-editor-title" novalidate>
           <fieldset id="history-fields">
             <legend id="history-vehicle"></legend>
-            <fieldset id="session-defaults">
-              <legend>Defaults for new records</legend>
-              <div class="field">
-                <label for="default-date">Default date</label>
-                <p class="hint" id="date-format">Use YYYY-MM-DD, YYYY-MM, or YYYY. Keep only the precision you know.</p>
-                <input id="default-date" name="defaultDate" maxlength="10" aria-describedby="date-format">
-              </div>
-              <div class="field">
-                <label id="default-odometer-label" for="default-odometer">Default odometer (optional)</label>
-                <input id="default-odometer" name="defaultOdometer" type="number" min="0" step="any" inputmode="decimal">
-              </div>
-            </fieldset>
             <div id="record-editors"></div>
             <div id="session-add-actions" class="actions">
-              <button id="add-observation" type="button" class="secondary">Add observation</button>
-              <button id="add-odometer" type="button" class="secondary">Add odometer reading</button>
-              <button id="add-gap" type="button" class="secondary">Add known gap</button>
+              <button id="add-fueling" type="button" class="secondary">Fuel up</button>
+              <button id="add-oil-change" type="button" class="secondary">Change oil</button>
+              <button id="add-tire-change" type="button" class="secondary">Change tires</button>
+              <button id="add-maintenance" type="button" class="secondary">Other maintenance</button>
+              <button id="add-observation" type="button" class="secondary">Check / inspect</button>
+              <button id="add-odometer" type="button" class="secondary">Odometer reading</button>
             </div>
             <div class="actions history-submit">
               <button id="submit-history" type="submit">Save records</button>
@@ -117,6 +110,16 @@
               <p id="odometerUnit-error" class="field-error" hidden></p>
             </fieldset>
             <div class="field">
+              <label for="vehicle-fuel-unit">Fuel units</label>
+              <select id="vehicle-fuel-unit" name="fuelUnit">
+                <option value="L">Litres (L)</option>
+                <option value="US gal">US gallons (US gal)</option>
+                <option value="Imp gal">Imperial gallons (Imp gal)</option>
+              </select>
+            </div>
+            <details id="optional-vehicle-details">
+              <summary>Optional details</summary>
+            <div class="field">
               <label for="vehicle-make">Make (optional)</label>
               <input id="vehicle-make" name="make" maxlength="100" aria-invalid="false">
               <p id="make-error" class="field-error" hidden></p>
@@ -136,9 +139,11 @@
               <textarea id="vehicle-notes" name="notes" rows="4" maxlength="5000" aria-invalid="false"></textarea>
               <p id="notes-error" class="field-error" hidden></p>
             </div>
+            </details>
             <div class="actions">
               <button id="submit-vehicle" type="submit">Create vehicle</button>
               <button id="cancel-edit" type="button" class="secondary">Cancel</button>
+              <button id="delete-vehicle" type="button" class="secondary" hidden>Delete vehicle</button>
             </div>
           </fieldset>
           <p id="form-error" role="alert"></p>
@@ -146,6 +151,6 @@
       </section>
       <noscript><p>JavaScript is needed to open and save your vehicles on this device.</p></noscript>
     </main>
-    <script type="module" src="./app.js"></script>
+    <script type="module" src="./app.js?v=cf4ee93be591"></script>
   </body>
 </html>

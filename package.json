@@ -6,7 +6,9 @@
     "start": "node scripts/serve.mjs",
     "test": "node --test tests/*.test.js",
     "test:browser": "playwright test",
-    "check": "npm test && npm run test:browser"
+    "version:assets": "node scripts/version-assets.mjs --write",
+    "check:assets": "node scripts/version-assets.mjs",
+    "check": "npm run check:assets && npm test && npm run test:browser"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1"

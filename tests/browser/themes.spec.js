@@ -60,7 +60,7 @@ test('system changes, saved overrides and cross-tab changes preserve draft and f
 
 test('saved theme is applied before application modules load', async ({ page }) => {
   await page.addInitScript(key => localStorage.setItem(key, 'dark'), themeKey);
-  await page.route('**/app.js', route => route.abort());
+  await page.route(/\/app\.js(?:\?.*)?$/, route => route.abort());
   await page.emulateMedia({ colorScheme: 'light' });
   await page.goto('./');
   await expectPalette(page, true);
@@ -103,7 +103,7 @@ test('both themes retain phone targets, focus, validation and reflow at enlarged
     await expect(name).toBeFocused();
     await expect(name).toHaveCSS('outline-width', '3px');
     await expect(page.locator('#name-error')).toHaveCSS('color', theme === 'dark' ? 'rgb(255, 180, 171)' : 'rgb(179, 38, 30)');
-    const targets = await page.locator('button:visible, select:visible, input:not([type="radio"]):visible, textarea:visible, .choices label:visible').evaluateAll(elements => elements.map(element => {
+    const targets = await page.locator('button:visible, summary:visible, select:visible, input:not([type="radio"]):visible, textarea:visible, .choices label:visible').evaluateAll(elements => elements.map(element => {
       const box = element.getBoundingClientRect();
       return { id: element.id || element.textContent, width: box.width, height: box.height };
     }));
@@ -116,6 +116,7 @@ test('both themes retain phone targets, focus, validation and reflow at enlarged
   await page.addStyleTag({ content: 'html { font-size: 200%; } * { line-height: 1.5 !important; letter-spacing: .12em !important; word-spacing: .16em !important; } p { margin-block-end: 2em !important; }' });
   await page.getByLabel('Vehicle name (required)').fill('W'.repeat(100));
   await page.getByLabel('Kilometres (km)', { exact: true }).check();
+  await page.locator('#optional-vehicle-details > summary').click();
   await page.getByLabel('Notes (optional)', { exact: true }).fill('LongWord'.repeat(100));
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole('button', { name: 'Create vehicle', exact: true }).click();

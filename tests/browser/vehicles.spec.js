@@ -93,7 +93,10 @@ test('keyboard creation, accessible validation, correction and cancel @live', as
   await expect(page.locator('#name-error')).toContainText('non-blank');
   await name.fill('Keyboard car');
   await expect(name).toHaveAttribute('aria-invalid', 'false');
+  await expect(page.getByLabel('Year (optional)', { exact: true })).toBeHidden();
+  await page.locator('#optional-vehicle-details > summary').click();
   await page.getByLabel('Year (optional)', { exact: true }).fill('1e2');
+  await page.locator('#optional-vehicle-details > summary').click();
   await page.getByRole('button', { name: 'Create vehicle', exact: true }).click();
   await expect(page.getByLabel('Year (optional)', { exact: true })).toBeFocused();
   await page.getByLabel('Year (optional)', { exact: true }).fill('');
@@ -102,6 +105,10 @@ test('keyboard creation, accessible validation, correction and cancel @live', as
   await expect(page.getByLabel('Kilometres (km)', { exact: true })).toBeFocused();
   await page.keyboard.press('ArrowRight');
   await expect(page.getByLabel('Miles (mi)', { exact: true })).toBeChecked();
+  await page.keyboard.press('Tab');
+  await expect(page.getByLabel('Fuel units', { exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#optional-vehicle-details > summary')).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.getByLabel('Make (optional)', { exact: true })).toBeFocused();
   await page.keyboard.press('Enter');
@@ -160,6 +167,7 @@ test('aborted real IndexedDB write preserves editable work, never announces succ
   await expect(page.locator('#storage-error')).toContainText('Your work is still open here');
   expect(await loadSnapshot(page)).toBeNull();
   expect(await page.evaluate(() => window.saveMessages)).not.toContain('Saved on this device.');
+  await page.locator('#optional-vehicle-details > summary').click();
   await page.getByLabel('Notes (optional)', { exact: true }).fill('Still editable after failure.');
   await page.getByRole('button', { name: 'Retry saving details' }).click();
   await expect(page.getByRole('status')).toHaveText('Saved on this device.');
@@ -225,12 +233,12 @@ test('a prior v1 collection reopens and edits without replacing IDs, notes or de
   }, fixture);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Older Civic' })).toBeVisible();
-  expect((await loadSnapshot(page)).collection).toEqual({ ...fixture, schemaVersion: 2 });
+  expect((await loadSnapshot(page)).collection).toEqual({ ...fixture, schemaVersion: 3, vehicles: fixture.vehicles.map(vehicle => ({ ...vehicle, fuelUnit: 'L' })) });
   await page.getByRole('button', { name: 'All vehicles' }).click();
   await createVehicle(page, 'Another vehicle');
   const result = (await loadSnapshot(page)).collection;
   expect(result.id).toBe(fixture.id);
-  expect(result.vehicles[0]).toEqual(fixture.vehicles[0]);
+  expect(result.vehicles[0]).toEqual({ ...fixture.vehicles[0], fuelUnit: 'L' });
   expect(result.tombstones).toEqual(fixture.tombstones);
 });
 

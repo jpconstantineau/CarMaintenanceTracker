@@ -27,8 +27,11 @@ if (build.commit !== commit || build.status !== 'built') {
   process.exitCode = 2;
 } else {
   const files = ['index.html', 'app.js', 'history.js', 'calculations.js', 'interface.js', 'storage.js', 'styles.css'];
+  const index = execFileSync('git', ['show', `${commit}:docs/index.html`], { encoding: 'utf8' });
+  const version = index.match(/app\.js\?v=([a-f0-9]{12})/)?.[1];
   result.assets = await Promise.all(files.map(async file => {
-    const response = await fetch(`${site}${file}?release=${commit}`, { cache: 'no-store' });
+    const query = file !== 'index.html' && version ? `v=${version}` : `release=${commit}`;
+    const response = await fetch(`${site}${file}?${query}`, { cache: 'no-store' });
     const expected = execFileSync('git', ['show', `${commit}:docs/${file}`], { encoding: 'utf8' });
     const normalize = text => text.replaceAll('\r\n', '\n').trimEnd();
     return { file, matches: response.ok && normalize(await response.text()) === normalize(expected) };

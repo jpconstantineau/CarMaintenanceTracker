@@ -1,5 +1,6 @@
 export const FORMAT = 'car-maintenance-tracker';
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
+export const FUEL_UNITS = ['L', 'US gal', 'Imp gal'];
 
 export class ValidationError extends Error {
   constructor(message, field) {
@@ -23,17 +24,20 @@ function text(value, field, maximum, required = false) {
     `Enter ${required ? 'a non-blank' : 'an optional'} ${field} of at most ${maximum} characters.`, field);
 }
 
-function id(value) {
-  requireValue(typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value), 'Expected a stable UUID.');
+function id(value, vehicle = false) {
+  const stamp = typeof value === 'string' ? Number.parseInt(value, 36) : NaN;
+  const timestampId = vehicle && Number.isSafeInteger(stamp) && stamp >= 0 && stamp.toString(36) === value;
+  requireValue(typeof value === 'string' && (timestampId || /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)), 'Expected a stable record ID.');
 }
 
 function timestamp(value) {
   requireValue(typeof value === 'string' && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value, 'Expected an ISO edit timestamp.');
 }
 
-function vehicleDetails(vehicle) {
+function vehicleDetails(vehicle, version = SCHEMA_VERSION) {
   text(vehicle.name, 'name', 100, true);
   requireValue(['km', 'mi'].includes(vehicle.odometerUnit), 'Choose kilometres or miles.', 'odometerUnit');
+  if (version >= 3) requireValue(FUEL_UNITS.includes(vehicle.fuelUnit), 'Choose litres, US gallons, or Imperial gallons.', 'fuelUnit');
   text(vehicle.make, 'make', 100);
   text(vehicle.model, 'model', 100);
   text(vehicle.notes, 'notes', 5000);
@@ -59,14 +63,19 @@ export function dateBounds(value, field = 'date') {
 }
 
 function validateEvent(record) {
-  shape(record, eventKeys, 'Observation');
+  shape(record, record.kind === 'fueling' ? [...eventKeys, 'fuelAmount', 'fuelUnit', 'tankStatus'] : eventKeys, 'Vehicle activity');
   dateBounds(record.date);
   requireValue(record.odometer === null || (typeof record.odometer === 'number' && Number.isFinite(record.odometer) && record.odometer >= 0 && record.odometer <= Number.MAX_SAFE_INTEGER), 'Enter a nonnegative odometer reading, or leave it blank.', 'odometer');
   requireValue(['km', 'mi'].includes(record.odometerUnit), 'Choose kilometres or miles.', 'odometerUnit');
   text(record.notes, 'notes', 5000);
-  requireValue(record.kind !== 'odometer' || record.odometer !== null, 'An odometer-only record needs a reading. Choose an observation to keep other partial history.', 'odometer');
+  requireValue(record.kind !== 'odometer' || record.odometer !== null, 'An odometer-only record needs a reading. Choose a car activity to keep other partial history.', 'odometer');
   timestamp(record.createdAt);
   timestamp(record.updatedAt);
+  if (record.kind === 'fueling') {
+    requireValue(record.fuelAmount === null || (typeof record.fuelAmount === 'number' && Number.isFinite(record.fuelAmount) && record.fuelAmount > 0), 'Enter a positive fuel quantity, or leave it blank.', 'fuelAmount');
+    requireValue(FUEL_UNITS.includes(record.fuelUnit), 'Choose litres, US gallons, or Imperial gallons.', 'fuelUnit');
+    requireValue(['full', 'partial', 'unknown'].includes(record.tankStatus), 'Choose full, partial, or unknown tank status.', 'tankStatus');
+  }
 }
 
 export const HISTORY_TYPES = ['all', 'odometer', 'observation', 'maintenance', 'oil', 'tires', 'fueling'];
@@ -82,7 +91,11 @@ function validateGap(record) {
   timestamp(record.updatedAt);
 }
 
-const recordValidators = new Map([['odometer', validateEvent], ['observation', validateEvent], ['gap', validateGap]]);
+const recordValidators = new Map([
+  ...['odometer', 'observation', 'fueling', 'oil-change', 'tire-change', 'maintenance'].map(kind => [kind, validateEvent]),
+  ['gap', validateGap],
+]);
+const versionTwoKinds = ['odometer', 'observation', 'gap'];
 
 export function validateCollection(collection) {
   return validateVersion(collection, SCHEMA_VERSION);
@@ -95,20 +108,21 @@ function validateVersion(collection, version) {
   id(collection.id);
   for (const key of ['vehicles', 'records', 'tombstones']) requireValue(Array.isArray(collection[key]), `${key} must be a list.`);
   const identities = new Set([collection.id]);
-  const unique = value => {
-    id(value);
+  const unique = (value, vehicle = false) => {
+    id(value, vehicle);
     requireValue(!identities.has(value), 'Duplicate record identity.');
     identities.add(value);
   };
   for (const vehicle of collection.vehicles) {
-    shape(vehicle, ['id', 'name', 'odometerUnit', 'make', 'model', 'year', 'notes', 'createdAt', 'updatedAt'], 'Vehicle');
-    unique(vehicle.id);
-    vehicleDetails(vehicle);
+    shape(vehicle, ['id', 'name', 'odometerUnit', 'make', 'model', 'year', 'notes', 'createdAt', 'updatedAt', ...(version >= 3 ? ['fuelUnit'] : [])], 'Vehicle');
+    unique(vehicle.id, version >= 3);
+    vehicleDetails(vehicle, version);
     timestamp(vehicle.createdAt);
     timestamp(vehicle.updatedAt);
   }
   for (const record of collection.records) {
     requireValue(version !== 1, 'Version one does not support factual records.');
+    requireValue(version !== 2 || versionTwoKinds.includes(record?.kind), 'This record kind is not supported in version two.');
     requireValue(record !== null && typeof record === 'object', 'Record must be an object.');
     unique(record.id);
     requireValue(collection.vehicles.some(vehicle => vehicle.id === record.vehicleId), 'Record refers to a missing vehicle.');
@@ -118,17 +132,20 @@ function validateVersion(collection, version) {
   }
   for (const marker of collection.tombstones) {
     shape(marker, ['id', 'kind', 'deletedAt'], 'Deletion marker');
-    unique(marker.id);
-    requireValue(marker.kind === 'vehicle' || (version !== 1 && recordValidators.has(marker.kind)), 'Unsupported deletion kind.');
+    unique(marker.id, version >= 3 && marker.kind === 'vehicle');
+    requireValue(marker.kind === 'vehicle' || (version !== 1 && recordValidators.has(marker.kind) && (version !== 2 || versionTwoKinds.includes(marker.kind))), 'Unsupported deletion kind.');
     timestamp(marker.deletedAt);
   }
   return collection;
 }
 
 export function migrateCollection(collection) {
-  if (collection?.schemaVersion === 1) {
-    validateVersion(collection, 1);
-    return validateCollection({ ...structuredClone(collection), schemaVersion: SCHEMA_VERSION });
+  if ([1, 2].includes(collection?.schemaVersion)) {
+    validateVersion(collection, collection.schemaVersion);
+    const migrated = structuredClone(collection);
+    migrated.schemaVersion = SCHEMA_VERSION;
+    migrated.vehicles = migrated.vehicles.map(vehicle => ({ ...vehicle, fuelUnit: 'L' }));
+    return validateCollection(migrated);
   }
   return validateCollection(collection);
 }
@@ -146,14 +163,14 @@ export function getVehicle(collection, vehicleId) {
 
 export function saveVehicle(collection, details, vehicleId = null) {
   validateCollection(collection);
-  details = { make: '', model: '', year: null, notes: '', ...details };
-  shape(details, ['name', 'odometerUnit', 'make', 'model', 'year', 'notes'], 'Vehicle details');
+  details = { make: '', model: '', year: null, notes: '', fuelUnit: 'L', ...details };
+  shape(details, ['name', 'odometerUnit', 'make', 'model', 'year', 'notes', 'fuelUnit'], 'Vehicle details');
   vehicleDetails(details);
   const next = structuredClone(collection);
   const now = new Date().toISOString();
   const previous = vehicleId === null ? null : getVehicle(collection, vehicleId);
   const vehicle = {
-    id: previous?.id ?? crypto.randomUUID(),
+    id: previous?.id ?? newVehicleId(collection),
     ...details,
     name: details.name.trim(),
     createdAt: previous?.createdAt ?? now,
@@ -165,12 +182,23 @@ export function saveVehicle(collection, details, vehicleId = null) {
   return { collection: next, vehicleId: vehicle.id };
 }
 
+function newVehicleId(collection) {
+  const used = new Set([collection.id, ...collection.vehicles.map(value => value.id), ...collection.records.map(value => value.id), ...collection.tombstones.map(value => value.id)]);
+  let milliseconds = Date.now();
+  while (used.has(milliseconds.toString(36))) milliseconds++;
+  return milliseconds.toString(36);
+}
+
 export function removeVehicle(collection, vehicleId) {
   getVehicle(collection, vehicleId);
-  requireValue(!collection.records.some(record => record.vehicleId === vehicleId), 'Remove associated records before removing this vehicle.');
   const next = structuredClone(collection);
+  const deletedAt = new Date().toISOString();
+  for (const record of next.records.filter(record => record.vehicleId === vehicleId)) {
+    next.tombstones.push({ id: record.id, kind: record.kind, deletedAt });
+  }
+  next.records = next.records.filter(record => record.vehicleId !== vehicleId);
   next.vehicles = next.vehicles.filter(vehicle => vehicle.id !== vehicleId);
-  next.tombstones.push({ id: vehicleId, kind: 'vehicle', deletedAt: new Date().toISOString() });
+  next.tombstones.push({ id: vehicleId, kind: 'vehicle', deletedAt });
   return validateCollection(next);
 }
 
