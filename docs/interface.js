@@ -5,6 +5,31 @@ export async function start(document, storage) {
   const byId = id => document.getElementById(id);
   const form = byId('vehicle-form');
   const view = document.defaultView;
+  const theme = byId('theme');
+  const scheme = document.querySelector('meta[name="color-scheme"]');
+  const themeKey = 'car-maintenance-tracker.theme';
+  function applyTheme(value) {
+    const preference = ['light', 'dark'].includes(value) ? value : 'system';
+    scheme.content = preference === 'system' ? 'light dark' : preference;
+    theme.value = preference;
+  }
+  applyTheme(scheme.content);
+  theme.addEventListener('change', () => {
+    applyTheme(theme.value);
+    try {
+      if (theme.value === 'system') view.localStorage.removeItem(themeKey);
+      else view.localStorage.setItem(themeKey, theme.value);
+      byId('theme-status').textContent = '';
+    } catch {
+      byId('theme-status').textContent = 'Theme applies to this page only.';
+    }
+  });
+  view.addEventListener('storage', event => {
+    if (event.key === themeKey || event.key === null) {
+      applyTheme(event.newValue);
+      byId('theme-status').textContent = '';
+    }
+  });
   let snapshot;
   let editingId = null;
   let pending = false;
@@ -26,12 +51,12 @@ export async function start(document, storage) {
   function render(focus = true) {
     const list = byId('vehicle-list');
     list.replaceChildren();
-    byId('empty-list').hidden = snapshot.collection.vehicles.length !== 0;
     for (const vehicle of snapshot.collection.vehicles) {
       const li = document.createElement('li');
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = vehicle.name;
+      if (vehicle.id === snapshot.selectedVehicleId) button.setAttribute('aria-current', 'true');
       button.addEventListener('click', async () => {
         if (busy) return;
         snapshot.selectedVehicleId = vehicle.id;
@@ -48,7 +73,8 @@ export async function start(document, storage) {
     const summary = summarizeVehicle(snapshot.collection, snapshot.selectedVehicleId);
     const vehicle = summary.vehicle;
     byId('vehicle-title').textContent = vehicle.name;
-    byId('vehicle-description').textContent = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') || 'No identifying details added.';
+    byId('vehicle-description').textContent = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
+    byId('vehicle-description').hidden = !byId('vehicle-description').textContent;
     byId('summary-units').textContent = vehicle.odometerUnit === 'km' ? 'Kilometres (km)' : 'Miles (mi)';
     byId('summary-mileage').textContent = `Unknown — ${summary.odometer.reason}`;
     byId('summary-history').textContent = `No entries yet. ${summary.history.reason}`;

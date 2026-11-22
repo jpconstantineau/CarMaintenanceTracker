@@ -3,14 +3,30 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light">
+    <meta name="color-scheme" content="light dark">
+    <script>
+      try {
+        const theme = localStorage.getItem('car-maintenance-tracker.theme');
+        if (theme === 'light' || theme === 'dark') {
+          document.querySelector('meta[name="color-scheme"]').content = theme;
+        }
+      } catch { /* The system theme remains available when storage is blocked. */ }
+    </script>
     <title>Car Maintenance Tracker</title>
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
     <header>
       <h1>Car Maintenance Tracker</h1>
-      <p>Your vehicles, one history at a time.</p>
+      <div class="theme-control">
+        <label for="theme">Theme</label>
+        <select id="theme" name="theme">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+        <p id="theme-status" role="status"></p>
+      </div>
     </header>
     <main>
       <div class="save-state">
@@ -21,7 +37,6 @@
 
       <section id="selection" aria-labelledby="selection-title" hidden>
         <h2 id="selection-title" tabindex="-1">Your vehicles</h2>
-        <p id="empty-list">Start with a name and odometer units. No past mileage or service records needed.</p>
         <ul id="vehicle-list"></ul>
         <button id="add-vehicle" type="button">Add vehicle</button>
       </section>
@@ -41,10 +56,8 @@
 
       <section id="vehicle-editor" aria-labelledby="editor-title" hidden>
         <h2 id="editor-title" tabindex="-1">Add vehicle</h2>
-        <p>Only name and odometer units are required. Details save on this device when you submit.</p>
         <form id="vehicle-form" aria-labelledby="editor-title" novalidate>
-          <fieldset id="editor-fields">
-            <legend>Vehicle details</legend>
+          <fieldset id="editor-fields" aria-labelledby="editor-title">
             <div class="field">
               <label for="vehicle-name">Vehicle name (required)</label>
               <p id="name-hint" class="hint">A name you recognize, such as “Blue Civic”. Up to 100 characters.</p>
@@ -89,10 +102,6 @@
       </section>
       <noscript><p>JavaScript is needed to open and save your vehicles on this device.</p></noscript>
     </main>
-    <footer>
-      <p>Vehicle details stay in this browser on this device. Clearing site data removes them.</p>
-      <p>Coming later: maintenance entries, tires, fueling, forecasts, JSON transfer, and GitHub Gist sync.</p>
-    </footer>
     <script type="module" src="./app.js"></script>
   </body>
 </html>

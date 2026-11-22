@@ -3,4 +3,4 @@ CarMaintenanceTracker is a vanilla HTML/CSS/JS app that's hosted on GitHub Pages
 The intent of the application is to store car maintenance history.
 Data storage for a user should be on the user's github gist account.
 
-When designing HTML layout and CSS, use the purposeful-web-design skill.
+When designing HTML layout and CSS, use the purposeful-web-design skill and follow [DESIGN.md](DESIGN.md) for themes, color, layout, typography, and accessibility requirements.

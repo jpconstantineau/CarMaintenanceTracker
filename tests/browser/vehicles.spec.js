@@ -12,12 +12,14 @@ test('a full browser restart restores durable data @live', async ({ baseURL, bro
     let page = await browserContext.newPage();
     await page.goto('./');
     await createVehicle(page, 'Durable vehicle');
+    await page.getByLabel('Theme', { exact: true }).selectOption('dark');
     const original = await loadSnapshot(page);
     await browserContext.close();
     browserContext = await browserType.launchPersistentContext(profile, options);
     page = await browserContext.newPage();
     await page.goto('./');
     await expect(page.getByRole('heading', { name: 'Durable vehicle' })).toBeVisible();
+    await expect(page.getByLabel('Theme', { exact: true })).toHaveValue('dark');
     expect(await loadSnapshot(page)).toEqual(original);
   } finally { await browserContext.close(); }
 });
@@ -74,6 +76,8 @@ test('create, edit, isolate multiple vehicles and reopen the selected collection
 test('keyboard creation, accessible validation, correction and cancel @live', async ({ page }) => {
   await page.goto('./');
   await expect(page.getByRole('button', { name: 'Add vehicle', exact: true })).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(page.getByLabel('Theme', { exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Add vehicle', exact: true })).toBeFocused();
   await page.keyboard.press('Enter');
