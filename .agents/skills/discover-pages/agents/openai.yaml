@@ -1,0 +1,5 @@
+interface:
+  display_name: "Discover User Interface Pages"
+  short_description: "Discover User Interface pages through interview"
+policy:
+  allow_implicit_invocation: false

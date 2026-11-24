@@ -1,0 +1,5 @@
+interface:
+  display_name: "Grill UI Philosophy"
+  short_description: "Sharpen a UI design philosophy through interview"
+policy:
+  allow_implicit_invocation: false
